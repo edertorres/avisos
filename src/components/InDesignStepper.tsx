@@ -47,13 +47,13 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
   };
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 hover:border-slate-300 transition-colors">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 truncate">
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 hover:border-slate-300 transition-colors">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5 truncate">
           {icon}
           {label}
         </span>
-        <span className="text-[10px] font-mono text-slate-400 font-medium">
+        <span className="text-[11px] font-mono text-slate-600 font-bold">
           {min}-{max}{unit}
         </span>
       </div>
@@ -77,10 +77,10 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
             max={max}
             value={Number(value.toFixed(dec))}
             onChange={handleInputChange}
-            className="w-full text-center text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded py-1 px-1 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+            className="w-full text-center text-sm font-mono font-extrabold text-slate-950 bg-white border border-slate-300 rounded py-1.5 px-1 focus:ring-2 focus:ring-slate-900 focus:outline-none"
           />
           {unit && (
-            <span className="absolute right-1.5 text-[10px] font-bold text-slate-400 pointer-events-none select-none">
+            <span className="absolute right-1.5 text-xs font-extrabold text-slate-500 pointer-events-none select-none">
               {unit}
             </span>
           )}
@@ -106,7 +106,7 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
                 key={p}
                 type="button"
                 onClick={() => onChange(p)}
-                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-all shrink-0 ${
+                className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border transition-all shrink-0 ${
                   isSelected
                     ? 'bg-slate-900 text-white font-bold border-slate-900'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'

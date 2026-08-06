@@ -106,7 +106,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-slate-900 text-slate-100 flex flex-col font-sans overflow-hidden">
+    <div className="h-screen w-screen bg-slate-100 text-slate-900 flex flex-col font-sans overflow-hidden">
       {/* Header Bar */}
       <Header
         onLoadSample={handleLoadSample}

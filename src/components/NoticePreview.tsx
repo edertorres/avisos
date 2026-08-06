@@ -5,14 +5,12 @@ import { compileNoticeToSvg } from '../utils/typstService';
 import { generateTypstMarkup } from '../utils/typstGenerator';
 import {
   AlertTriangle,
-  CheckCircle2,
   Sparkles,
   ZoomIn,
   ZoomOut,
   Ruler,
   Download,
   Info,
-  Eye,
   Type,
   AlignJustify,
   AlignLeft,
@@ -190,23 +188,18 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
   return (
     <div className="bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
       {/* Top Controls Bar */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Eye className="w-4 h-4 text-slate-600" />
-          <span className="text-xs font-bold text-slate-800">Lienzo Typst CLI en Tiempo Real</span>
-          <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1">
-            <FileCode2 className="w-3 h-3 text-blue-600" />
-            Renderizado Vectorial
+      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900 uppercase tracking-wide">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950 text-emerald-300">
+            <Ruler className="w-4 h-4" />
           </span>
-          <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-            {config.size.widthCm} × {config.size.heightCm} cm ({config.marginMm}mm margen)
-          </span>
+          <span>Vista previa</span>
         </div>
 
         {/* Zoom controls & Scale info */}
         <div className="flex items-center gap-2">
           {isCompilingTypst && (
-            <div className="flex items-center gap-1 text-[11px] text-blue-600 font-semibold animate-pulse mr-2">
+            <div className="flex items-center gap-1 text-xs text-blue-600 font-bold animate-pulse mr-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               <span>Compilando...</span>
             </div>
@@ -219,7 +212,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[11px] font-mono font-bold text-slate-700 px-1 w-12 text-center">
+            <span className="text-xs font-mono font-extrabold text-slate-800 px-1 w-12 text-center">
               {Math.round((zoomScale / 2.2) * 100)}%
             </span>
             <button
@@ -231,7 +224,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             </button>
             <button
               onClick={() => setZoomScale(2.2)}
-              className="px-1.5 py-0.5 text-[10px] bg-white text-slate-700 hover:bg-slate-200 rounded font-semibold border border-slate-300 ml-1"
+              className="px-2 py-1 text-xs bg-white text-slate-700 hover:bg-slate-200 rounded font-bold border border-slate-300 ml-1"
             >
               Zoom 100%
             </button>
@@ -241,11 +234,11 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
 
       {/* Overflow Banner Indicator */}
       {overflowData.isOverflowing ? (
-        <div className="bg-rose-50 border-b border-rose-200 p-2.5 flex flex-wrap items-center justify-between gap-2 text-rose-900 animate-fadeIn">
-          <div className="flex items-center gap-2 text-xs font-bold">
+        <div className="bg-rose-50 border-b border-rose-200 p-3 flex flex-wrap items-center justify-between gap-2 text-rose-900 animate-fadeIn">
+          <div className="flex items-center gap-2 text-sm font-black">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>
-              ¡DESBORDE DE TEXTO EN TYPST! El contenido excede el espacio de {config.size.heightCm} cm.
+              Desborde de texto. El contenido excede el espacio de {config.size.heightCm} cm.
             </span>
           </div>
 
@@ -261,7 +254,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             {recommendedNextSize && (
               <button
                 onClick={() => onSelectSize(recommendedNextSize)}
-                className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-100 text-rose-900 font-bold text-xs rounded border border-rose-300 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-rose-100 text-rose-900 font-bold text-xs rounded border border-rose-300 transition-colors"
               >
                 <Ruler className="w-3.5 h-3.5 text-rose-600" />
                 Usar {recommendedNextSize.widthCm}×{recommendedNextSize.heightCm} cm
@@ -269,28 +262,20 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             )}
           </div>
         </div>
-      ) : (
-        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-1 flex items-center justify-between text-emerald-800 text-xs font-semibold">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Previsualización 100% idéntica al PDF final (Motor Typst CLI)</span>
-          </div>
-          <span className="text-[10px] text-emerald-700 font-normal">Escala Vectorial 1:1</span>
-        </div>
-      )}
+      ) : null}
 
       {/* QUICK CANVAS FLOATING TOOLBAR */}
-      <div className="bg-slate-900 text-white px-4 py-2 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs">
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-            <Type className="w-3.5 h-3.5 text-emerald-400" /> Atributos Rápidos:
+      <div className="bg-white text-slate-900 px-4 py-3 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2 text-xs shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-1.5">
+            <Type className="w-3.5 h-3.5 text-emerald-600" /> Atributos Rápidos
           </span>
 
           {/* Quick Font selector */}
           <select
             value={config.fontFamily}
             onChange={(e) => onConfigChange({ fontFamily: e.target.value as FontFamily })}
-            className="bg-white text-slate-900 border border-slate-300 rounded px-2.5 py-1 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-slate-400"
+            className="bg-white text-slate-900 border border-slate-300 rounded-md px-2.5 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-slate-900"
           >
             {FONT_OPTIONS.map((font) => (
               <option key={font.value} value={font.value} className="text-slate-900 bg-white font-sans">
@@ -300,19 +285,19 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           </select>
 
           {/* Font size +/- controls */}
-          <div className="flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-            <span className="text-[10px] text-slate-400">Letra:</span>
+          <div className="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200">
+            <span className="text-xs text-slate-600 font-extrabold uppercase">Letra</span>
             <button
               onClick={() => onConfigChange({ bodyFontSizePt: Math.max(4.5, Number((config.bodyFontSizePt - 0.25).toFixed(2))) })}
-              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
               title="Reducir letra"
             >
               <Minus className="w-3 h-3" />
             </button>
-            <span className="font-mono font-bold text-emerald-300 px-1">{config.bodyFontSizePt}pt</span>
+            <span className="font-mono font-extrabold text-slate-950 px-1 min-w-14 text-center text-sm">{config.bodyFontSizePt}pt</span>
             <button
               onClick={() => onConfigChange({ bodyFontSizePt: Math.min(14, Number((config.bodyFontSizePt + 0.25).toFixed(2))) })}
-              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
               title="Aumentar letra"
             >
               <Plus className="w-3 h-3" />
@@ -320,22 +305,22 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           </div>
 
           {/* Line-height +/- controls */}
-          <div className="flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-emerald-700/60 shadow-sm">
-            <Rows3 className="w-3.5 h-3.5 text-emerald-300" />
-            <span className="text-[10px] text-slate-300 font-semibold">Inter:</span>
+          <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1.5 rounded-md border border-emerald-200 shadow-sm">
+            <Rows3 className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="text-xs text-emerald-800 font-extrabold uppercase">Inter</span>
             <button
               onClick={() => onConfigChange({ lineHeight: Math.max(0.85, Number((config.lineHeight - 0.02).toFixed(2))) })}
-              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-emerald-200"
               title="Reducir interlineado"
             >
               <Minus className="w-3 h-3" />
             </button>
-            <span className="font-mono font-extrabold text-emerald-200 bg-slate-950/70 rounded px-1.5 min-w-10 text-center">
+            <span className="font-mono font-extrabold text-emerald-950 bg-white rounded px-1.5 min-w-12 text-center border border-emerald-200 text-sm">
               {config.lineHeight.toFixed(2)}
             </span>
             <button
               onClick={() => onConfigChange({ lineHeight: Math.min(1.8, Number((config.lineHeight + 0.02).toFixed(2))) })}
-              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-emerald-200"
               title="Aumentar interlineado"
             >
               <Plus className="w-3 h-3" />
@@ -343,7 +328,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           </div>
 
           {/* Alignment quick buttons */}
-          <div className="flex items-center gap-0.5 bg-slate-800 p-0.5 rounded border border-slate-700">
+          <div className="flex items-center gap-0.5 bg-slate-100 p-1.5 rounded-md border border-slate-200">
             {[
               { align: 'justify', icon: AlignJustify, label: 'Justificar' },
               { align: 'left', icon: AlignLeft, label: 'Izquierda' },
@@ -355,8 +340,8 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
                 <button
                   key={btn.align}
                   onClick={() => onConfigChange({ textAlign: btn.align as TextAlign })}
-                  className={`p-1 rounded transition-colors ${
-                    active ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-300 hover:bg-slate-700'
+                  className={`p-1.5 rounded transition-colors ${
+                    active ? 'bg-slate-950 text-white font-bold shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'
                   }`}
                   title={btn.label}
                 >
@@ -371,13 +356,13 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onAutoFitFont}
-            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded transition-colors"
+            className="flex items-center gap-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-md shadow-sm transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Auto-Encajar</span>
           </button>
 
-          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600 hover:text-slate-950 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
             <input
               type="checkbox"
               checked={config.showMarginGuides}
@@ -390,9 +375,9 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
       </div>
 
       {/* Main Preview Work Area */}
-      <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-start justify-center pt-8 pb-16 relative bg-slate-200/70">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-start justify-center pt-8 pb-16 relative bg-slate-100">
         <div
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 opacity-10 pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(#000 1px, transparent 1px)`,
             backgroundSize: `16px 16px`,
@@ -401,11 +386,11 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
 
         {/* Notice Card Frame Container */}
         <div className="relative transition-all duration-200">
-          <div className="absolute -top-5 left-0 right-0 flex justify-between text-[9px] font-mono text-slate-500 font-bold">
+          <div className="absolute -top-6 left-0 right-0 flex justify-between text-xs font-mono text-slate-500 font-bold">
             <span>0 cm</span>
             <span>{config.size.widthCm} cm</span>
           </div>
-          <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-mono text-slate-500 font-bold text-right pr-1">
+          <div className="absolute -left-7 top-0 bottom-0 flex flex-col justify-between text-xs font-mono text-slate-500 font-bold text-right pr-1">
             <span>0</span>
             <span>{config.size.heightCm}cm</span>
           </div>
@@ -417,7 +402,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
               width: `${pixelWidth}px`,
               height: `${pixelHeight}px`,
             }}
-            className={`bg-white text-black relative shadow-2xl transition-shadow overflow-hidden box-border ${
+            className={`bg-white text-black relative shadow-xl transition-shadow overflow-hidden box-border border border-slate-300 ${
               overflowData.isOverflowing ? 'ring-4 ring-rose-500/80' : ''
             }`}
           >
@@ -455,20 +440,16 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
 
           {/* Real physical size label floating */}
           <div className="mt-3 text-center">
-            <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-700 shadow-lg">
-              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 font-extrabold text-blue-800 border border-blue-200">
-                <FileCode2 className="w-3.5 h-3.5" />
-                Typst CLI Vector
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 font-extrabold text-white border border-slate-700">
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-mono text-slate-700 shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-950 px-3 py-1.5 font-extrabold text-white border border-slate-800">
                 <Ruler className="w-3.5 h-3.5 text-emerald-300" />
                 {config.size.widthCm} × {config.size.heightCm} cm
               </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 font-extrabold text-amber-900 border border-amber-200">
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-3 py-1.5 font-extrabold text-amber-900 border border-amber-200">
                 <FileText className="w-3.5 h-3.5 text-amber-600" />
                 {wordCount} palabras
               </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 font-extrabold text-emerald-900 border border-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 font-extrabold text-emerald-900 border border-emerald-200">
                 <Rows3 className="w-3.5 h-3.5 text-emerald-600" />
                 Inter {config.lineHeight.toFixed(2)}
               </span>
@@ -478,16 +459,16 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
       </div>
 
       {/* Footer Quick Action Bar */}
-      <div className="bg-white border-t border-slate-200 p-3 flex items-center justify-between">
-        <div className="text-xs text-slate-500 flex items-center gap-1.5">
-          <Info className="w-4 h-4 text-slate-400" />
-          <span>Exportación nativa en PDF vectorial mediante motor Typst CLI.</span>
+      <div className="bg-white border-t border-slate-200 p-3 flex items-center justify-between gap-3">
+        <div className="text-sm text-slate-600 font-bold flex items-center gap-1.5">
+          <Info className="w-4 h-4 text-slate-500" />
+          <span>{overflowData.isOverflowing ? 'Ajusta el aviso antes de exportar.' : 'Aviso listo para exportar.'}</span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowCodeModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 shadow-sm transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 font-bold text-sm rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 shadow-sm transition-colors"
             title="Ver o copiar el código Typst completo de este edicto"
           >
             <FileCode2 className="w-4 h-4 text-blue-600" />
@@ -497,7 +478,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           <button
             onClick={() => onExportPdf('single-exact')}
             disabled={isExporting || overflowData.isOverflowing}
-            className={`flex items-center gap-1.5 px-4 py-2 font-bold text-xs rounded-lg shadow transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 font-bold text-sm rounded-lg shadow transition-colors ${
               overflowData.isOverflowing
                 ? 'bg-rose-100 text-rose-800 border border-rose-300 cursor-not-allowed opacity-90'
                 : 'bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50'
