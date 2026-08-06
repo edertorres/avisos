@@ -24,6 +24,8 @@ import {
   Copy,
   Check,
   X,
+  Rows3,
+  FileText,
 } from 'lucide-react';
 
 const PT_PER_CM = 28.3465;
@@ -121,6 +123,12 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
   const pixelWidth = config.size.widthCm * BASE_DPI_PX_PER_CM * zoomScale;
   const pixelHeight = config.size.heightCm * BASE_DPI_PX_PER_CM * zoomScale;
   const marginPx = (config.marginMm / 10) * BASE_DPI_PX_PER_CM * zoomScale;
+  const wordCount = (config.bodyText || '')
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/\*\*/g, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 
   // Real-time Typst CLI vector compilation through the local server
   useEffect(() => {
@@ -311,6 +319,29 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             </button>
           </div>
 
+          {/* Line-height +/- controls */}
+          <div className="flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-emerald-700/60 shadow-sm">
+            <Rows3 className="w-3.5 h-3.5 text-emerald-300" />
+            <span className="text-[10px] text-slate-300 font-semibold">Inter:</span>
+            <button
+              onClick={() => onConfigChange({ lineHeight: Math.max(0.85, Number((config.lineHeight - 0.02).toFixed(2))) })}
+              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              title="Reducir interlineado"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <span className="font-mono font-extrabold text-emerald-200 bg-slate-950/70 rounded px-1.5 min-w-10 text-center">
+              {config.lineHeight.toFixed(2)}
+            </span>
+            <button
+              onClick={() => onConfigChange({ lineHeight: Math.min(1.8, Number((config.lineHeight + 0.02).toFixed(2))) })}
+              className="p-1 hover:bg-slate-700 rounded text-slate-200"
+              title="Aumentar interlineado"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+
           {/* Alignment quick buttons */}
           <div className="flex items-center gap-0.5 bg-slate-800 p-0.5 rounded border border-slate-700">
             {[
@@ -424,13 +455,24 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
 
           {/* Real physical size label floating */}
           <div className="mt-3 text-center">
-            <span className="text-xs font-mono bg-white text-slate-700 px-3 py-1 rounded-full shadow border border-slate-300 font-semibold inline-flex items-center gap-1.5">
-              <span>Motor:</span>
-              <span className="text-blue-700 font-bold">Typst CLI Vector</span>
-              <span className="text-slate-400">|</span>
-              <span>Dimensión:</span>
-              <span className="text-slate-900 font-bold">{config.size.widthCm} × {config.size.heightCm} cm</span>
-            </span>
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-700 shadow-lg">
+              <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 font-extrabold text-blue-800 border border-blue-200">
+                <FileCode2 className="w-3.5 h-3.5" />
+                Typst CLI Vector
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 font-extrabold text-white border border-slate-700">
+                <Ruler className="w-3.5 h-3.5 text-emerald-300" />
+                {config.size.widthCm} × {config.size.heightCm} cm
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 font-extrabold text-amber-900 border border-amber-200">
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
+                {wordCount} palabras
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 font-extrabold text-emerald-900 border border-emerald-200">
+                <Rows3 className="w-3.5 h-3.5 text-emerald-600" />
+                Inter {config.lineHeight.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
