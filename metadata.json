@@ -1,0 +1,8 @@
+{
+  "name": "Remix Generador de Avisos Impresos PDF",
+  "description": "Herramienta profesional para crear y exportar avisos impresos en escala de grises con dimensiones exactas en cm, control de márgenes, logo y detector de desborde de texto.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
