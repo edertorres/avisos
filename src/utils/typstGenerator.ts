@@ -122,25 +122,25 @@ export function formatTypstBodyText(text: string, boldKeywords: string[] = [], b
  * Maps input font family string to Typst font tuple
  */
 function getTypstFontList(fontFamily: string): string {
-  if (fontFamily.includes('PT Sans')) return '("PT Sans", "Arimo", "Roboto")';
-  if (fontFamily.includes('Arimo') || fontFamily.includes('Myriad')) return '("Arimo", "PT Sans", "Roboto")';
-  if (fontFamily.includes('Roboto Condensed') || fontFamily.includes('Narrow') || fontFamily.includes('Arial Narrow')) return '("Roboto Condensed", "Arimo", "PT Sans")';
-  if (fontFamily.includes('Lato') || fontFamily.includes('Helvetica')) return '("Lato", "Arimo", "PT Sans")';
-  if (fontFamily.includes('Roboto')) return '("Roboto", "Arimo", "PT Sans")';
-  if (fontFamily.includes('Tinos') || fontFamily.includes('Times')) return '("Tinos", "Lora", "PT Sans")';
-  if (fontFamily.includes('Lora') || fontFamily.includes('Georgia')) return '("Lora", "Tinos", "PT Sans")';
-  if (fontFamily.includes('Courier')) return '("Courier Prime", "PT Sans")';
-  return '("PT Sans", "Arimo", "Roboto")';
+  if (fontFamily.includes('PT Sans')) return '("PT Sans", "Arimo", "Roboto", "Noto Sans")';
+  if (fontFamily.includes('Arimo') || fontFamily.includes('Myriad')) return '("Arimo", "Roboto", "PT Sans", "Noto Sans")';
+  if (fontFamily.includes('Roboto Condensed') || fontFamily.includes('Narrow') || fontFamily.includes('Arial Narrow')) return '("Roboto Condensed", "Roboto", "Arimo", "Noto Sans")';
+  if (fontFamily.includes('Lato') || fontFamily.includes('Helvetica')) return '("Lato", "Arimo", "Roboto", "Noto Sans")';
+  if (fontFamily.includes('Roboto')) return '("Roboto", "Arimo", "PT Sans", "Noto Sans")';
+  if (fontFamily.includes('Tinos') || fontFamily.includes('Times')) return '("Tinos", "Liberation Serif", "Noto Serif")';
+  if (fontFamily.includes('Lora') || fontFamily.includes('Georgia')) return '("Noto Serif", "Liberation Serif", "Tinos")';
+  if (fontFamily.includes('Courier')) return '("Liberation Mono", "Courier Prime", "Noto Sans Mono")';
+  return '("PT Sans", "Arimo", "Roboto", "Noto Sans")';
 }
 
 function getTypstBoldFontList(fontFamily: string): string {
   if (fontFamily.includes('Roboto Condensed') || fontFamily.includes('Narrow') || fontFamily.includes('Arial Narrow')) {
-    return '("Roboto", "Myriad Pro", "Noto Sans")';
+    return '("Roboto Condensed", "Roboto", "Arimo", "Noto Sans")';
   }
-  if (fontFamily.includes('Tinos') || fontFamily.includes('Times')) return '("Liberation Serif", "Noto Serif", "Myriad Pro")';
-  if (fontFamily.includes('Lora') || fontFamily.includes('Georgia')) return '("Noto Serif", "Liberation Serif", "Myriad Pro")';
-  if (fontFamily.includes('Courier')) return '("Liberation Mono", "Courier Prime", "Myriad Pro")';
-  return '("Myriad Pro", "Roboto", "Noto Sans")';
+  if (fontFamily.includes('Tinos') || fontFamily.includes('Times')) return '("Tinos", "Liberation Serif", "Noto Serif")';
+  if (fontFamily.includes('Lora') || fontFamily.includes('Georgia')) return '("Noto Serif", "Liberation Serif", "Tinos")';
+  if (fontFamily.includes('Courier')) return '("Liberation Mono", "Noto Sans Mono", "Roboto")';
+  return '("Roboto", "Arimo", "Noto Sans", "PT Sans")';
 }
 
 function typstLogoImage(logoPath: string, logoWidthMm: string): string {
