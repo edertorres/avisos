@@ -13,7 +13,6 @@ RUN apt-get update \
     fonts-lato \
     fonts-liberation2 \
     fonts-noto-core \
-    fonts-pt-sans \
     fonts-roboto \
     xz-utils \
   && curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" -o /tmp/typst.tar.xz \

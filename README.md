@@ -36,4 +36,4 @@ For Coolify, use the included `Dockerfile`. Configure the public domain as:
 `https://avisos.rreditores.com`
 
 The Docker image installs Typst CLI and the system fonts used by the PDF renderer
-(`PT Sans`, `Roboto`, `Lato`, `Arimo`, `Tinos`, `Liberation` and `Noto` fallbacks).
+(`Roboto`, `Lato`, `Arimo`, `Tinos`, `Liberation` and `Noto` fallbacks).
