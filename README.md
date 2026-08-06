@@ -8,6 +8,8 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/08c22f97-110d-44e6-8a11-daaf064de123
 
+Manual de usuario: [MANUAL_USUARIO.md](MANUAL_USUARIO.md)
+
 ## Run Locally
 
 **Prerequisites:**  Node.js and Typst CLI available in your `PATH`
