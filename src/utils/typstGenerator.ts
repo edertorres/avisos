@@ -156,7 +156,6 @@ function typstLogoImage(logoPath: string, logoWidthMm: string): string {
 export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boolean = false, logoPath: string = '/logo.png'): string {
   const fontList = getTypstFontList(config.fontFamily);
   const boldFontList = getTypstBoldFontList(config.fontFamily);
-  const headerAlign = config.headerAlign || 'center';
   const textAlign = config.textAlign || 'justify';
   const leadingEm = Math.max(-0.2, config.lineHeight - 1.0); // leading in Typst
   const trackingMm = `${config.letterSpacingMm || 0}mm`;
@@ -171,10 +170,10 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
 
   const titleParts: string[] = [];
   if (headerTitle) {
-    titleParts.push(`#align(${headerAlign})[#text(font: ${boldFontList}, size: ${config.headerFontSizePt}pt, weight: 700)[${headerTitle}]]`);
+    titleParts.push(`#block(width: 100%)[#set par(justify: false)\n#align(center)[#text(font: ${boldFontList}, size: ${config.headerFontSizePt}pt, weight: 700)[${headerTitle}]]]`);
   }
   if (subheaderTitle) {
-    titleParts.push(`#align(${headerAlign})[#text(font: ${boldFontList}, size: ${config.subheaderFontSizePt}pt, weight: 700)[${subheaderTitle}]]`);
+    titleParts.push(`#block(width: 100%)[#set par(justify: false)\n#align(center)[#text(font: ${boldFontList}, size: ${config.subheaderFontSizePt}pt, weight: 700)[${subheaderTitle}]]]`);
   }
 
   let titlesBlock = '';

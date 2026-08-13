@@ -17,6 +17,7 @@ import {
   Sparkles,
   Bold,
   Plus,
+  Minus,
   Trash2,
   FileUp,
   Layers,
@@ -232,6 +233,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 
   const highlightedCount = config.boldKeywords?.length || 0;
   const bodyWordCount = (config.bodyText || '').trim().split(/\s+/).filter(Boolean).length;
+
+  const renderSimpleFontSizeControl = (
+    label: string,
+    value: number,
+    onValueChange: (value: number) => void,
+    min: number,
+    max: number
+  ) => (
+    <div className="flex items-center justify-between gap-2 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200">
+      <span className="text-xs text-slate-600 font-extrabold uppercase">{label}</span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onValueChange(Math.max(min, Number((value - 0.5).toFixed(1))))}
+          className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
+          title={`Reducir ${label.toLowerCase()}`}
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <span className="font-mono font-extrabold text-slate-950 px-1 min-w-14 text-center text-sm">
+          {value}pt
+        </span>
+        <button
+          type="button"
+          onClick={() => onValueChange(Math.min(max, Number((value + 0.5).toFixed(1))))}
+          className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
+          title={`Aumentar ${label.toLowerCase()}`}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
 
   const handleAddCustomSizeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -535,9 +569,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 
           {/* Titles Inputs */}
           <div className="space-y-2">
-            <div>
+            <div className="space-y-2">
               <label className="block text-xs font-extrabold text-slate-700 mb-1">
-                Título Principal
+                Título 1
               </label>
               <input
                 type="text"
@@ -545,13 +579,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 onChange={(e) => onChange({ headerTitle: e.target.value })}
                 onPaste={(e) => handleTitlePaste(e, 'headerTitle')}
                 placeholder="Ej: AVISO ÚNICO, EDICTO, CITACIÓN"
-                className="w-full text-sm font-bold border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase"
+                className="w-full text-sm font-bold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase"
               />
+              {renderSimpleFontSizeControl('Tamaño Título 1', config.headerFontSizePt, (headerFontSizePt) => onChange({ headerFontSizePt }), 5, 24)}
             </div>
 
-            <div>
+            <div className="space-y-2">
               <label className="block text-xs font-extrabold text-slate-700 mb-1">
-                Subtítulo / Entidad
+                Título 2
               </label>
               <textarea
                 rows={2}
@@ -559,8 +594,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 onChange={(e) => onChange({ subheaderTitle: e.target.value })}
                 onPaste={(e) => handleTitlePaste(e, 'subheaderTitle')}
                 placeholder="Ej: LA DIRECTORA DE TALENTO HUMANO DEL DEPARTAMENTO DE RISARALDA"
-                className="w-full text-sm font-semibold border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase resize-none"
+                className="w-full text-sm font-semibold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase resize-none"
               />
+              {renderSimpleFontSizeControl('Tamaño Título 2', config.subheaderFontSizePt, (subheaderFontSizePt) => onChange({ subheaderFontSizePt }), 4.5, 18)}
             </div>
           </div>
 
@@ -773,7 +809,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               />
 
               <InDesignStepper
-                label="Título Principal"
+                label="Tamaño Título 1"
                 value={config.headerFontSizePt}
                 onChange={(headerFontSizePt) => onChange({ headerFontSizePt })}
                 min={5}
@@ -785,7 +821,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               />
 
               <InDesignStepper
-                label="Subtítulo / Entidad"
+                label="Tamaño Título 2"
                 value={config.subheaderFontSizePt}
                 onChange={(subheaderFontSizePt) => onChange({ subheaderFontSizePt })}
                 min={4.5}
