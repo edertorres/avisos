@@ -51,24 +51,25 @@ export default function App() {
     showToast('Formulario limpiado');
   };
 
-  // Reinforced High-Precision Auto-fit font algorithm
-  const handleAutoFitFont = useCallback(() => {
-    const containerEl = document.querySelector('[data-notice-canvas="true"] > div') as HTMLElement;
-    if (!containerEl) {
-      showToast('No se encontró el lienzo para calcular el auto-ajuste');
-      return;
-    }
+  // High-precision auto-fit: Typst CLI compiles trial sizes and chooses the largest one that fits.
+  const handleAutoFitFont = useCallback(async () => {
+    try {
+      showToast('Calculando auto-ajuste con Typst...');
+      const result = await calculateAutoFitFont(config);
+      if (!result) {
+        showToast('No se pudo calcular el auto-ajuste.');
+        return;
+      }
 
-    const result = calculateAutoFitFont(config, containerEl);
-    if (!result) {
-      showToast('No se pudo calcular el auto-ajuste.');
-      return;
+      if (Object.keys(result.changes).length > 0) {
+        handleConfigChange(result.changes);
+      }
+      showToast(result.message);
+    } catch (err) {
+      console.error('Auto-fit error:', err);
+      const message = err instanceof Error ? err.message : 'Revisa que Typst compile el aviso actual.';
+      showToast(`No se pudo auto-ajustar: ${message}`);
     }
-
-    if (Object.keys(result.changes).length > 0) {
-      handleConfigChange(result.changes);
-    }
-    showToast(result.message);
   }, [config, handleConfigChange]);
 
   // Export PDF handler

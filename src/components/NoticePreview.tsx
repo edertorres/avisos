@@ -154,7 +154,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           setIsCompilingTypst(false);
         }
       }
-    }, 80);
+    }, 450);
 
     return () => {
       isCancelled = true;

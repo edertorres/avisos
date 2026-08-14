@@ -33,6 +33,21 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+const PT_PER_CM = 28.3465;
+
+interface AutoFitResult {
+  changes: Partial<NoticeConfig>;
+  message: string;
+}
+
+interface FitProbe {
+  config: NoticeConfig;
+  bodyPt: number;
+  headerPt: number;
+  subheaderPt: number;
+  lineHeight: number;
+}
+
 function decodeLogoDataUrl(url: string): ImageAsset | null {
   const match = url.match(/^data:([^;,]+)?((?:;[^,]*)*),(.*)$/s);
   if (!match) return null;
@@ -105,6 +120,147 @@ function fixSvgDimensions(svgString: string): string {
   return result;
 }
 
+function chooseLineHeight(bodyPt: number): number {
+  if (bodyPt < 5.5) return 1.0;
+  if (bodyPt < 7.0) return 1.08;
+  if (bodyPt < 9.0) return 1.15;
+  return 1.25;
+}
+
+function parsePageHeightPt(svg: string, fallbackHeightCm: number): number {
+  const viewBoxMatch = svg.match(/viewBox="0 0 ([\d.]+)\s+([\d.]+)"/);
+  const dataHeightMatch = svg.match(/data-height="([\d.]+)"/);
+
+  if (viewBoxMatch) return parseFloat(viewBoxMatch[2]);
+  if (dataHeightMatch) return parseFloat(dataHeightMatch[1]);
+  return fallbackHeightCm * PT_PER_CM;
+}
+
+function detectOverflowFromTypstSvg(svg: string, config: NoticeConfig): boolean {
+  const pageMatches = svg.match(/class="typst-page"/g);
+  const pageCount = pageMatches ? pageMatches.length : 1;
+  if (pageCount > 1) return true;
+
+  const pageHeightPt = parsePageHeightPt(svg, config.size.heightCm);
+  let maxBaselineY = 0;
+
+  const matrixRe = /transform="matrix\(1 0 0 -1\s+(-?[\d.]+)\s+(-?[\d.]+)\)"/g;
+  let matrixMatch: RegExpExecArray | null;
+  while ((matrixMatch = matrixRe.exec(svg)) !== null) {
+    const y = parseFloat(matrixMatch[2]);
+    if (!Number.isNaN(y) && y > maxBaselineY) {
+      maxBaselineY = y;
+    }
+  }
+
+  const translateRe = /transform="translate\(\s*-?[\d.]+\s*,\s*(-?[\d.]+)\s*\)"/g;
+  let translateMatch: RegExpExecArray | null;
+  while ((translateMatch = translateRe.exec(svg)) !== null) {
+    const y = parseFloat(translateMatch[1]);
+    if (!Number.isNaN(y) && y > maxBaselineY) {
+      maxBaselineY = y;
+    }
+  }
+
+  if (maxBaselineY === 0) return false;
+
+  const estimatedTextBottomPt = maxBaselineY + Math.max(1.5, config.bodyFontSizePt * 0.35);
+  return estimatedTextBottomPt > pageHeightPt - 0.5;
+}
+
+function buildProbeConfig(probe: FitProbe): NoticeConfig {
+  return {
+    ...probe.config,
+    bodyFontSizePt: probe.bodyPt,
+    headerFontSizePt: probe.headerPt,
+    subheaderFontSizePt: probe.subheaderPt,
+    lineHeight: probe.lineHeight,
+  };
+}
+
+function getScaledProbe(config: NoticeConfig, bodyPt: number): FitProbe {
+  const safeCurrentBody = Math.max(0.1, config.bodyFontSizePt);
+  const headerRatio = config.headerFontSizePt / safeCurrentBody;
+  const subheaderRatio = config.subheaderFontSizePt / safeCurrentBody;
+
+  return {
+    config,
+    bodyPt: Number(bodyPt.toFixed(2)),
+    headerPt: Number(Math.max(5.0, Math.min(20.0, bodyPt * headerRatio)).toFixed(2)),
+    subheaderPt: Number(Math.max(4.5, Math.min(16.0, bodyPt * subheaderRatio)).toFixed(2)),
+    lineHeight: chooseLineHeight(bodyPt),
+  };
+}
+
+async function fitsInTypst(probe: FitProbe): Promise<boolean> {
+  const probeConfig = buildProbeConfig(probe);
+  const svg = await compileWithTypstCli({
+    config: probeConfig,
+    exportType: 'single-exact',
+    format: 'svg',
+  });
+  return !detectOverflowFromTypstSvg(String(svg), probeConfig);
+}
+
+async function calculateAutoFitWithTypst(config: NoticeConfig): Promise<AutoFitResult> {
+  const minBodyPt = 4.0;
+  const maxBodyPt = 14.0;
+  const currentBodyPt = Math.max(minBodyPt, Math.min(maxBodyPt, config.bodyFontSizePt));
+
+  const minProbe = getScaledProbe(config, minBodyPt);
+  const minFits = await fitsInTypst(minProbe);
+
+  if (!minFits) {
+    return {
+      changes: {
+        bodyFontSizePt: minProbe.bodyPt,
+        headerFontSizePt: minProbe.headerPt,
+        subheaderFontSizePt: minProbe.subheaderPt,
+        lineHeight: minProbe.lineHeight,
+      },
+      message: 'El texto no cabe ni con la fuente mínima. Reduce contenido o aumenta el alto del aviso.',
+    };
+  }
+
+  let low = minBodyPt;
+  let high = maxBodyPt;
+  let bestProbe = minProbe;
+
+  for (let i = 0; i < 8; i += 1) {
+    const mid = Number(((low + high) / 2).toFixed(2));
+    const probe = getScaledProbe(config, mid);
+    const fits = await fitsInTypst(probe);
+
+    if (fits) {
+      bestProbe = probe;
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  const bodyDelta = Math.abs(bestProbe.bodyPt - currentBodyPt);
+
+  if (bodyDelta < 0.05 && bestProbe.lineHeight === config.lineHeight) {
+    return {
+      changes: {},
+      message: 'El aviso ya está encajado con el tamaño actual.',
+    };
+  }
+
+  const actionText = bestProbe.bodyPt < currentBodyPt ? 'reducida' : 'ampliada';
+
+  return {
+    changes: {
+      bodyFontSizePt: bestProbe.bodyPt,
+      headerFontSizePt: bestProbe.headerPt,
+      subheaderFontSizePt: bestProbe.subheaderPt,
+      lineHeight: bestProbe.lineHeight,
+    },
+    message: `Fuente ${actionText} a ${bestProbe.bodyPt} pt según compilación real de Typst.`,
+  };
+}
+
 async function compileWithTypstCli({ config, exportType = 'single-exact', format = 'pdf' }: CompileRequest): Promise<Buffer | string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'avisos-typst-'));
 
@@ -168,6 +324,23 @@ async function startServer() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error desconocido compilando con Typst CLI.';
       console.error('Typst CLI compile error:', error);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/typst/autofit', async (req, res) => {
+    try {
+      const { config }: { config?: NoticeConfig } = req.body;
+      if (!config) {
+        res.status(400).json({ error: 'Falta config para calcular el auto-ajuste.' });
+        return;
+      }
+
+      const result = await calculateAutoFitWithTypst(config);
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido calculando el auto-ajuste.';
+      console.error('Typst CLI auto-fit error:', error);
       res.status(500).json({ error: message });
     }
   });
