@@ -37,6 +37,7 @@ export interface NoticeConfig {
   borderWidthPx: number;
   grayscaleLogo: boolean;
   logoPosition?: 'left' | 'right' | 'top-center';
+  logoVerticalAlign?: 'body' | 'titles-top';
   contrastMode: 'normal' | 'high-contrast';
   showMarginGuides: boolean;
   headerAlign: 'center' | 'left' | 'right';

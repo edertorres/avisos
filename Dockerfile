@@ -14,6 +14,7 @@ RUN apt-get update \
     fonts-liberation2 \
     fonts-noto-core \
     fonts-roboto \
+    ghostscript \
     xz-utils \
   && curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" -o /tmp/typst.tar.xz \
   && tar -xJf /tmp/typst.tar.xz -C /tmp \

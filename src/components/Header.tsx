@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X, Save, FolderOpen, FileDown, FileUp } from 'lucide-react';
+import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X, Upload, Save, FolderOpen, FileDown, FileUp } from 'lucide-react';
 import manualText from '../../MANUAL_USUARIO.md?raw';
 
 interface HeaderProps {
   onLoadSample: () => void;
   onReset: () => void;
   onExportPdf: (type: 'single-exact' | 'a4-sheet') => void;
+  onOpenGrayPdfConverter: () => void;
   onSaveNotice: () => void;
   onOpenSavedNotices: () => void;
   onExportNoticeJson: () => void;
@@ -79,6 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLoadSample,
   onReset,
   onExportPdf,
+  onOpenGrayPdfConverter,
   onSaveNotice,
   onOpenSavedNotices,
   onExportNoticeJson,
@@ -176,6 +178,15 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden sm:inline">Limpiar</span>
+          </button>
+
+          <button
+            onClick={onOpenGrayPdfConverter}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 transition-colors"
+            title="Cargar un PDF externo y convertirlo a grises con Ghostscript"
+          >
+            <Upload className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="hidden sm:inline">Convertir PDF</span>
           </button>
 
           {/* Export Dropdown / Buttons */}

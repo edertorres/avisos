@@ -75,7 +75,7 @@ En la seccion **Logo Escudo** puedes:
   - Derecha flotante.
   - Centrado arriba.
 
-El logo se procesa en escala de grises desde Typst para que sea apto para impresion en rotativa. El texto y bordes se generan en negro.
+La exportacion PDF se procesa con Ghostscript en escala de grises DeviceGray para que sea apta para impresion en rotativa. El texto y bordes se generan en negro desde Typst, y Ghostscript acopla transparencias y convierte el resultado final.
 
 ## Atributos Rapidos
 

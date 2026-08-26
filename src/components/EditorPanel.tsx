@@ -586,6 +586,36 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                         })}
                       </div>
                     </div>
+
+                    {(config.logoPosition || 'left') !== 'top-center' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Alineación Vertical
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 bg-white p-1 rounded border border-slate-200">
+                          {[
+                            { value: 'body', label: 'Con texto' },
+                            { value: 'titles-top', label: 'Con títulos' },
+                          ].map((opt) => {
+                            const active = (config.logoVerticalAlign || 'body') === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => onChange({ logoVerticalAlign: opt.value as any })}
+                                className={`py-1.5 px-1 rounded text-[11px] font-bold transition-colors ${
+                                  active
+                                    ? 'bg-slate-900 text-white shadow-sm'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -145,9 +145,9 @@ function getTypstBoldFontList(fontFamily: string): string {
 
 function typstLogoImage(logoPath: string, logoWidthMm: string): string {
   if (logoPath.toLowerCase().endsWith('.svg')) {
-    return `image-grayscale(read("${logoPath}", encoding: none), format: "svg", width: ${logoWidthMm})`;
+    return `image(read("${logoPath}", encoding: none), format: "svg", width: ${logoWidthMm})`;
   }
-  return `image-grayscale(path("${logoPath}"), width: ${logoWidthMm})`;
+  return `image(path("${logoPath}"), width: ${logoWidthMm})`;
 }
 
 /**
@@ -163,6 +163,12 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   const marginMm = `${config.marginMm || 3}mm`;
   const logoWidthMm = `${config.logoWidthMm || 12}mm`;
   const logoPosition = config.logoPosition || 'left';
+  const logoVerticalAlign = config.logoVerticalAlign || 'body';
+  const bodyParSettings = `#set par(
+    justify: ${textAlign === 'justify' ? 'true' : 'false'},
+    leading: ${leadingEm.toFixed(3)}em,
+    spacing: ${leadingEm.toFixed(3)}em,
+  )`;
 
   const headerTitle = escapeTypstString(config.headerTitle);
   const subheaderTitle = escapeTypstString(config.subheaderTitle);
@@ -184,13 +190,39 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   if (hasLogoFile && (logoPosition === 'left' || logoPosition === 'right')) {
     const wrapAlign = logoPosition === 'right' ? 'top + right' : 'top + left';
     const logoImage = typstLogoImage(logoPath, logoWidthMm);
-    return `#import "@preview/wrap-it:0.1.1": wrap-content
-#import "@preview/grayness:0.7.0": image-grayscale
+    const wrappedBodyText = `${bodyParSettings}
+${formattedBody.trim()}`;
+    const wrapBody = `${titlesBlock}#wrap-content(
+    ${logoImage},
+    [${wrappedBodyText}],
+    align: ${wrapAlign},
+    column-gutter: 2.5mm,
+    row-gutter: 0mm
+  )`;
+
+    if (logoVerticalAlign === 'titles-top') {
+      const logoAndTitles = logoPosition === 'right'
+        ? `#grid(
+    columns: (1fr, ${logoWidthMm}),
+    column-gutter: 2.5mm,
+    align: (center, top),
+    [${titlesBlock}],
+    [#${logoImage}],
+  )`
+        : `#grid(
+    columns: (${logoWidthMm}, 1fr),
+    column-gutter: 2.5mm,
+    align: (center, top),
+    [#${logoImage}],
+    [${titlesBlock}],
+  )`;
+
+      return `#import "@preview/wrap-it:0.1.1": wrap-content
 
 #block(
   width: 100%,
   height: 100%,
-  stroke: ${borderWidth} + rgb("#000000"),
+  stroke: ${borderWidth} + luma(0%),
   inset: ${marginMm},
   outset: 0pt,
 )[
@@ -198,34 +230,47 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
     font: ${fontList},
     size: ${config.bodyFontSizePt}pt,
     tracking: ${trackingMm},
-    fill: rgb("#000000"),
+    fill: luma(0%),
     hyphenate: false,
   )
-  #set par(
-    justify: ${textAlign === 'justify' ? 'true' : 'false'},
-    leading: ${leadingEm.toFixed(3)}em,
-    spacing: ${leadingEm.toFixed(3)}em,
-  )
+  ${bodyParSettings}
 
-  ${titlesBlock}#wrap-content(
-    ${logoImage},
-    [${formattedBody.trim()}],
-    align: ${wrapAlign},
-    column-gutter: 2.5mm,
-    row-gutter: 0mm
+  ${logoAndTitles}
+  ${wrappedBodyText}
+]`;
+    }
+
+    return `#import "@preview/wrap-it:0.1.1": wrap-content
+
+#block(
+  width: 100%,
+  height: 100%,
+  stroke: ${borderWidth} + luma(0%),
+  inset: ${marginMm},
+  outset: 0pt,
+)[
+  #set text(
+    font: ${fontList},
+    size: ${config.bodyFontSizePt}pt,
+    tracking: ${trackingMm},
+    fill: luma(0%),
+    hyphenate: false,
   )
+  ${bodyParSettings}
+
+  ${wrapBody}
 ]`;
   }
 
   let topLogo = '';
   if (hasLogoFile && logoPosition === 'top-center') {
-    topLogo = `#import "@preview/grayness:0.7.0": image-grayscale\n#align(center)[#${typstLogoImage(logoPath, logoWidthMm)}]\n#v(1.5pt)\n`;
+    topLogo = `#align(center)[#${typstLogoImage(logoPath, logoWidthMm)}]\n#v(1.5pt)\n`;
   }
 
   return `#block(
   width: 100%,
   height: 100%,
-  stroke: ${borderWidth} + rgb("#000000"),
+  stroke: ${borderWidth} + luma(0%),
   inset: ${marginMm},
   outset: 0pt,
 )[
@@ -233,7 +278,7 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
     font: ${fontList},
     size: ${config.bodyFontSizePt}pt,
     tracking: ${trackingMm},
-    fill: rgb("#000000"),
+    fill: luma(0%),
     hyphenate: false,
   )
   #set par(
@@ -263,7 +308,7 @@ export function generateTypstMarkup(
   width: ${widthCm}cm,
   height: ${heightCm}cm,
   margin: 0mm,
-  fill: rgb("#ffffff"),
+  fill: luma(100%),
 )
 
 ${generateSingleNoticeBlock(config, hasLogoFile, logoPath)}
@@ -283,7 +328,7 @@ ${generateSingleNoticeBlock(config, hasLogoFile, logoPath)}
 #set page(
   paper: "a4",
   margin: (x: 1cm, y: 1cm),
-  fill: rgb("#ffffff"),
+  fill: luma(100%),
 )
 
 #grid(

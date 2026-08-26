@@ -12,7 +12,7 @@ Manual de usuario: [MANUAL_USUARIO.md](MANUAL_USUARIO.md)
 
 ## Run Locally
 
-**Prerequisites:**  Node.js and Typst CLI available in your `PATH`
+**Prerequisites:** Node.js, Typst CLI and Ghostscript (`gs`) available in your `PATH`
 
 
 1. Install dependencies:
@@ -21,7 +21,7 @@ Manual de usuario: [MANUAL_USUARIO.md](MANUAL_USUARIO.md)
 3. Run the app:
    `npm run dev`
 
-The local server exposes `/api/typst/compile` and uses `typst compile` to render SVG previews and PDF exports.
+The local server exposes `/api/typst/compile`. It uses `typst compile` to render SVG previews and an initial PDF, then Ghostscript (`gs`) converts PDF exports to flattened DeviceGray output for print. If `ISOnewspaper26v4_gr.icc` is available in the project/current directory, or `GRAY_ICC_PROFILE` points to an ICC file, that profile is used for the gray conversion.
 
 ## Deploy
 
@@ -35,5 +35,5 @@ For Coolify, use the included `Dockerfile`. Configure the public domain as:
 
 `https://avisos.rreditores.com`
 
-The Docker image installs Typst CLI and the system fonts used by the PDF renderer
+The Docker image installs Typst CLI, Ghostscript and the system fonts used by the PDF renderer
 (`Roboto`, `Lato`, `Arimo`, `Tinos`, `Liberation` and `Noto` fallbacks).

@@ -12,6 +12,7 @@ import { WRAP_IT_TYP_SOURCE } from './src/utils/wrapItSource';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_GRAY_ICC_PROFILE = 'ISOnewspaper26v4_gr.icc';
 
 interface CompileRequest {
   config: NoticeConfig;
@@ -22,6 +23,7 @@ interface CompileRequest {
 interface ImageAsset {
   bytes: Buffer;
   path: string;
+  extension: string;
 }
 
 const MIME_EXTENSION_MAP: Record<string, string> = {
@@ -48,6 +50,21 @@ interface FitProbe {
   lineHeight: number;
 }
 
+interface InkCoverage {
+  c: number;
+  m: number;
+  y: number;
+  k: number;
+}
+
+type GrayConversionMode = 'preserve' | 'flatten';
+
+interface PrintRiskAnalysis {
+  hasRisk: boolean;
+  warnings: string[];
+  recommendedMode: GrayConversionMode;
+}
+
 function decodeLogoDataUrl(url: string): ImageAsset | null {
   const match = url.match(/^data:([^;,]+)?((?:;[^,]*)*),(.*)$/s);
   if (!match) return null;
@@ -64,7 +81,7 @@ function decodeLogoDataUrl(url: string): ImageAsset | null {
     ? Buffer.from(payload, 'base64')
     : Buffer.from(decodeDataPayload(payload), 'utf8');
 
-  return { bytes, path: `/logo.${extension}` };
+  return { bytes, path: `/logo.${extension}`, extension };
 }
 
 async function resolveLogoAsset(url: string): Promise<ImageAsset | null> {
@@ -78,7 +95,32 @@ async function resolveLogoAsset(url: string): Promise<ImageAsset | null> {
   const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
   const extension = MIME_EXTENSION_MAP[contentType] || extensionFromUrl(url) || 'png';
   const bytes = Buffer.from(await response.arrayBuffer());
-  return { bytes, path: `/logo.${extension}` };
+  return { bytes, path: `/logo.${extension}`, extension };
+}
+
+async function writeLogoAssetForTypst(tempDir: string, logo: ImageAsset): Promise<string> {
+  const originalName = logo.path.slice(1);
+  const originalPath = path.join(tempDir, originalName);
+  await fs.writeFile(originalPath, logo.bytes);
+
+  if (logo.extension === 'svg') {
+    return logo.path;
+  }
+
+  const grayPath = path.join(tempDir, 'logo-gray.png');
+  await execFileAsync('magick', [
+    originalPath,
+    '-colorspace',
+    'Gray',
+    '-alpha',
+    'on',
+    grayPath,
+  ], {
+    timeout: 20000,
+    maxBuffer: 1024 * 1024 * 5,
+  });
+
+  return '/logo-gray.png';
 }
 
 function extensionFromUrl(url: string): string | null {
@@ -97,6 +139,142 @@ function decodeDataPayload(payload: string): string {
   } catch {
     return payload;
   }
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function resolveGrayIccProfile(): Promise<string | null> {
+  const candidates = [
+    process.env.GRAY_ICC_PROFILE,
+    path.join(process.cwd(), DEFAULT_GRAY_ICC_PROFILE),
+    path.join(__dirname, DEFAULT_GRAY_ICC_PROFILE),
+    path.join(__dirname, '..', DEFAULT_GRAY_ICC_PROFILE),
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+function parseInkCoverage(stdout: string): InkCoverage[] {
+  return stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^[0-9.]+\s+[0-9.]+\s+[0-9.]+\s+[0-9.]+/.test(line))
+    .map((line) => {
+      const [c, m, y, k] = line.split(/\s+/).map(Number);
+      return { c, m, y, k };
+    })
+    .filter(({ c, m, y, k }) => [c, m, y, k].every(Number.isFinite));
+}
+
+function countPdfToken(pdfText: string, pattern: RegExp): number {
+  return pdfText.match(pattern)?.length || 0;
+}
+
+function analyzePdfPrintRisk(pdfBytes: Buffer): PrintRiskAnalysis {
+  const pdfText = pdfBytes.toString('latin1');
+  const warnings: string[] = [];
+  const transparencyHits =
+    countPdfToken(pdfText, /\/Transparency\b/g) +
+    countPdfToken(pdfText, /\/SMask\b/g) +
+    countPdfToken(pdfText, /\/BM\s*\/(?!Normal\b)[A-Za-z]+/g) +
+    countPdfToken(pdfText, /\/(?:CA|ca)\s+(?:0?\.\d+|0\b)/g);
+
+  if (transparencyHits > 0) {
+    warnings.push(`Se detectaron ${transparencyHits} señales de transparencias, máscaras u opacidades.`);
+  }
+
+  const transparencyGroupHits = countPdfToken(pdfText, /\/Group\s*<<[^>]*\/S\s*\/Transparency/gs);
+  if (transparencyGroupHits > 0) {
+    warnings.push(`Se detectaron ${transparencyGroupHits} grupos de transparencia.`);
+  }
+
+  const blendModeHits = countPdfToken(pdfText, /\/BM\b/g);
+  if (blendModeHits > 0) {
+    warnings.push(`Se detectaron ${blendModeHits} referencias a modos de fusión.`);
+  }
+
+  const patternOrShadingHits =
+    countPdfToken(pdfText, /\/Pattern\b/g) +
+    countPdfToken(pdfText, /\/Shading\b/g) +
+    countPdfToken(pdfText, /\/ShadingType\b/g);
+  if (patternOrShadingHits > 0) {
+    warnings.push(`Se detectaron ${patternOrShadingHits} patrones o degradados que conviene revisar en RIP antiguo.`);
+  }
+
+  const formXObjectHits = countPdfToken(pdfText, /\/Subtype\s*\/Form\b/g);
+  if (formXObjectHits > 0) {
+    warnings.push(`Se detectaron ${formXObjectHits} formularios XObject; pueden contener capas, efectos o transparencias.`);
+  }
+
+  return {
+    hasRisk: warnings.length > 0,
+    warnings,
+    recommendedMode: warnings.length > 0 ? 'flatten' : 'preserve',
+  };
+}
+
+async function verifyGrayPdfWithInkcov(outputPath: string): Promise<void> {
+  const { stdout } = await execFileAsync('gs', ['-o', '-', '-sDEVICE=inkcov', outputPath], {
+    timeout: 20000,
+    maxBuffer: 1024 * 1024 * 10,
+  });
+
+  const coverage = parseInkCoverage(stdout);
+  const hasColor = coverage.some(({ c, m, y }) => c > 0 || m > 0 || y > 0);
+
+  if (hasColor) {
+    console.warn(`Ghostscript inkcov detectó tinta C, M o Y en ${outputPath}.`);
+  }
+}
+
+async function convertPdfToDeviceGrayWithGhostscript(
+  inputPath: string,
+  outputPath: string,
+  mode: GrayConversionMode = 'preserve'
+): Promise<void> {
+  const grayProfile = await resolveGrayIccProfile();
+  const compatibilityLevel = mode === 'flatten' ? '1.3' : '1.7';
+  const renderResolution = mode === 'flatten' ? '1200' : '300';
+  const gsArgs = [
+    '-sDEVICE=pdfwrite',
+    `-dCompatibilityLevel=${compatibilityLevel}`,
+    `-r${renderResolution}`,
+    '-dPDFSETTINGS=/prepress',
+    '-sColorConversionStrategy=Gray',
+    '-dProcessColorModel=/DeviceGray',
+    '-dOverrideICC=true',
+    '-dDownsampleColorImages=false',
+    '-dDownsampleGrayImages=false',
+    '-dDownsampleMonoImages=false',
+    '-dDetectDuplicateImages=true',
+    '-dCompressFonts=true',
+    '-dSubsetFonts=true',
+    '-dEmbedAllFonts=true',
+    '-dAutoRotatePages=/None',
+    '-dNOPAUSE',
+    '-dBATCH',
+    ...(grayProfile ? [`-sDefaultGrayProfile=${grayProfile}`] : []),
+    `-sOutputFile=${outputPath}`,
+    inputPath,
+  ];
+
+  await execFileAsync('gs', gsArgs, {
+    timeout: 30000,
+    maxBuffer: 1024 * 1024 * 10,
+  });
+
+  await verifyGrayPdfWithInkcov(outputPath);
 }
 
 function fixSvgDimensions(svgString: string): string {
@@ -269,8 +447,7 @@ async function compileWithTypstCli({ config, exportType = 'single-exact', format
     if (config.logoUrl) {
       const logo = await resolveLogoAsset(config.logoUrl);
       if (logo) {
-        logoPath = logo.path;
-        await fs.writeFile(path.join(tempDir, logo.path.slice(1)), logo.bytes);
+        logoPath = await writeLogoAssetForTypst(tempDir, logo);
       }
     }
 
@@ -291,8 +468,14 @@ async function compileWithTypstCli({ config, exportType = 'single-exact', format
       maxBuffer: 1024 * 1024 * 5,
     });
 
+    if (format === 'pdf') {
+      const grayPdfPath = path.join(tempDir, 'notice-gray.pdf');
+      await convertPdfToDeviceGrayWithGhostscript(outputPath, grayPdfPath);
+      return fs.readFile(grayPdfPath);
+    }
+
     const output = await fs.readFile(outputPath);
-    return format === 'svg' ? fixSvgDimensions(output.toString('utf8')) : output;
+    return fixSvgDimensions(output.toString('utf8'));
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
   }
@@ -304,6 +487,55 @@ async function startServer() {
   const host = process.env.HOST || '0.0.0.0';
 
   app.use(express.json({ limit: '25mb' }));
+
+  app.post('/api/pdf/analyze-print-risk', express.raw({ type: ['application/pdf', 'application/octet-stream'], limit: '100mb' }), (req, res) => {
+    try {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).json({ error: 'Debes cargar un PDF para analizar.' });
+        return;
+      }
+
+      res.json(analyzePdfPrintRisk(req.body));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido analizando el PDF.';
+      console.error('PDF print-risk analysis error:', error);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/pdf/convert-gray', express.raw({ type: ['application/pdf', 'application/octet-stream'], limit: '100mb' }), async (req, res) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'avisos-pdf-gray-'));
+
+    try {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).json({ error: 'Debes cargar un PDF para convertir.' });
+        return;
+      }
+
+      const inputPath = path.join(tempDir, 'input.pdf');
+      const outputPath = path.join(tempDir, 'output-gray.pdf');
+      const requestedMode = String(req.header('x-gray-conversion-mode') || '');
+      const conversionMode: GrayConversionMode = requestedMode === 'flatten' ? 'flatten' : 'preserve';
+      await fs.writeFile(inputPath, req.body);
+      await convertPdfToDeviceGrayWithGhostscript(inputPath, outputPath, conversionMode);
+
+      const originalName = decodeURIComponent(String(req.header('x-filename') || 'documento.pdf'));
+      const baseName = path.basename(originalName, path.extname(originalName)) || 'documento';
+      const outputName = `${baseName}_K.pdf`;
+      const output = await fs.readFile(outputPath);
+
+      res
+        .type('application/pdf')
+        .setHeader('Content-Disposition', `attachment; filename="${outputName.replace(/"/g, '')}"`)
+        .send(output);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido convirtiendo el PDF a grises.';
+      console.error('Ghostscript gray conversion error:', error);
+      res.status(500).json({ error: message });
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
 
   app.post('/api/typst/compile', async (req, res) => {
     try {

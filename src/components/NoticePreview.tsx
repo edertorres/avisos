@@ -175,6 +175,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
     config.logoUrl,
     config.logoWidthMm,
     config.logoPosition,
+    config.logoVerticalAlign,
     config.borderWidthPx,
     config.textAlign,
     config.headerAlign,

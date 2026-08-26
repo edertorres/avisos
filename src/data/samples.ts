@@ -16,6 +16,7 @@ export const DEFAULT_NOTICE_CONFIG: NoticeConfig = {
   logoUrl: null,
   logoWidthMm: 12,
   logoPosition: 'left',
+  logoVerticalAlign: 'body',
   size: INITIAL_SIZES[0], // 6.3 x 3 cm
   marginMm: 1,
   fontFamily: 'PT Sans, "Myriad Pro", "Segoe UI", sans-serif',
@@ -42,6 +43,7 @@ Así las cosas, quien crea tener igual o mejor derecho que la solicitante, debe 
   logoUrl: null,
   logoWidthMm: 12,
   logoPosition: 'left',
+  logoVerticalAlign: 'body',
   size: INITIAL_SIZES[0], // 6.3 x 3 cm
   marginMm: 1,
   fontFamily: 'PT Sans, "Myriad Pro", "Segoe UI", sans-serif',

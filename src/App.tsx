@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { NoticeConfig, SizeOption, OverflowStatus } from './types';
 import { INITIAL_SIZES, SAMPLE_NOTICE_IMAGE, DEFAULT_NOTICE_CONFIG } from './data/samples';
 import { Header } from './components/Header';
@@ -6,7 +6,13 @@ import { EditorPanel } from './components/EditorPanel';
 import { NoticePreview } from './components/NoticePreview';
 import { generateNoticePDF } from './utils/pdfGenerator';
 import { calculateAutoFitFont } from './utils/autoFitAlgorithm';
-import { Download, FileText, PanelLeftClose, PanelLeftOpen, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Download, FileText, Loader2, PanelLeftClose, PanelLeftOpen, Trash2, Upload, X } from 'lucide-react';
+
+interface PrintRiskAnalysis {
+  hasRisk: boolean;
+  warnings: string[];
+  recommendedMode: 'preserve' | 'flatten';
+}
 
 interface SavedNotice {
   id: string;
@@ -42,6 +48,15 @@ function isNoticeConfig(value: unknown): value is NoticeConfig {
   );
 }
 
+function filenameSafeName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'aviso';
+}
+
 function isSizeOption(value: unknown): value is SizeOption {
   if (!value || typeof value !== 'object') return false;
   const size = value as Partial<SizeOption>;
@@ -62,19 +77,18 @@ function mergeSizes(baseSizes: SizeOption[], extraSizes: SizeOption[]): SizeOpti
   }, baseSizes);
 }
 
-function filenameSafeName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'aviso';
-}
-
 export default function App() {
   const [config, setConfig] = useState<NoticeConfig>(DEFAULT_NOTICE_CONFIG);
   const [sizes, setSizes] = useState<SizeOption[]>(INITIAL_SIZES);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isGrayModalOpen, setIsGrayModalOpen] = useState<boolean>(false);
+  const [isConvertingGrayPdf, setIsConvertingGrayPdf] = useState<boolean>(false);
+  const [grayPdfFile, setGrayPdfFile] = useState<File | null>(null);
+  const [flattenGrayPdf, setFlattenGrayPdf] = useState<boolean>(false);
+  const [grayPdfProgress, setGrayPdfProgress] = useState<number>(0);
+  const [grayPdfProgressLabel, setGrayPdfProgressLabel] = useState<string>('');
+  const [isAnalyzingGrayPdf, setIsAnalyzingGrayPdf] = useState<boolean>(false);
+  const [grayPdfRisk, setGrayPdfRisk] = useState<PrintRiskAnalysis | null>(null);
   const [isEditorPanelCollapsed, setIsEditorPanelCollapsed] = useState<boolean>(false);
   const [savedNotices, setSavedNotices] = useState<SavedNotice[]>([]);
   const [isSavedNoticesOpen, setIsSavedNoticesOpen] = useState<boolean>(false);
@@ -90,20 +104,20 @@ export default function App() {
 
   useEffect(() => {
     try {
-      const rawNotices = localStorage.getItem(SAVED_NOTICES_KEY);
-      if (rawNotices) {
-        const parsedNotices = JSON.parse(rawNotices);
-        if (Array.isArray(parsedNotices)) {
-          setSavedNotices(parsedNotices.filter((item) => item && isNoticeConfig(item.config)));
+      const raw = localStorage.getItem(SAVED_NOTICES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setSavedNotices(parsed.filter((item) => item && isNoticeConfig(item.config)));
         }
       }
 
       const rawSizes = localStorage.getItem(CUSTOM_SIZES_KEY);
-      if (rawSizes) {
-        const parsedSizes = JSON.parse(rawSizes);
-        if (Array.isArray(parsedSizes)) {
-          setSizes(mergeSizes(INITIAL_SIZES, parsedSizes.filter(isSizeOption).map((size) => ({ ...size, isCustom: true }))));
-        }
+      if (!rawSizes) return;
+
+      const parsedSizes = JSON.parse(rawSizes);
+      if (Array.isArray(parsedSizes)) {
+        setSizes(mergeSizes(INITIAL_SIZES, parsedSizes.filter(isSizeOption).map((size) => ({ ...size, isCustom: true }))));
       }
     } catch (err) {
       console.warn('Saved notices/custom sizes load error:', err);
@@ -223,7 +237,7 @@ export default function App() {
 
         if (Array.isArray(parsed?.customSizes)) {
           parsed.customSizes.forEach((size: SizeOption) => {
-            if (isSizeOption(size)) {
+            if (size && typeof size.widthCm === 'number' && typeof size.heightCm === 'number') {
               ensureSizeAvailable(size);
             }
           });
@@ -273,6 +287,122 @@ export default function App() {
     showToast('Formulario limpiado');
   };
 
+  const resetGrayPdfModal = () => {
+    setIsGrayModalOpen(false);
+    setGrayPdfFile(null);
+    setFlattenGrayPdf(false);
+    setGrayPdfProgress(0);
+    setGrayPdfProgressLabel('');
+    setIsAnalyzingGrayPdf(false);
+    setGrayPdfRisk(null);
+  };
+
+  const analyzeGrayPdfRisk = async (file: File) => {
+    try {
+      setIsAnalyzingGrayPdf(true);
+      setGrayPdfRisk(null);
+
+      const response = await fetch('/api/pdf/analyze-print-risk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          'x-filename': encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+
+      if (!response.ok) return;
+
+      const analysis = (await response.json()) as PrintRiskAnalysis;
+      setGrayPdfRisk(analysis);
+
+      if (analysis.recommendedMode === 'flatten') {
+        setFlattenGrayPdf(true);
+      }
+    } catch (err) {
+      console.warn('PDF risk analysis error:', err);
+    } finally {
+      setIsAnalyzingGrayPdf(false);
+    }
+  };
+
+  const handleConvertGrayPdf = async () => {
+    if (!grayPdfFile) {
+      showToast('Selecciona un PDF para convertir.');
+      return;
+    }
+
+    try {
+      setIsConvertingGrayPdf(true);
+      setGrayPdfProgress(12);
+      setGrayPdfProgressLabel('Preparando archivo...');
+      showToast('Convirtiendo PDF externo a grises con Ghostscript...');
+
+      window.setTimeout(() => {
+        setGrayPdfProgress((current) => Math.max(current, 35));
+        setGrayPdfProgressLabel('Aplicando perfil ICC...');
+      }, 300);
+
+      window.setTimeout(() => {
+        setGrayPdfProgress((current) => Math.max(current, 68));
+        setGrayPdfProgressLabel(flattenGrayPdf ? 'Acoplando transparencias a 1200 dpi...' : 'Preservando vectores y fuentes...');
+      }, 1200);
+
+      const response = await fetch('/api/pdf/convert-gray', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          'x-filename': encodeURIComponent(grayPdfFile.name),
+          'x-gray-conversion-mode': flattenGrayPdf ? 'flatten' : 'preserve',
+        },
+        body: grayPdfFile,
+      });
+
+      if (!response.ok) {
+        let message = 'No se pudo convertir el PDF.';
+        try {
+          const body = await response.json();
+          message = body.error || message;
+        } catch {
+          message = await response.text();
+        }
+        throw new Error(message);
+      }
+
+      setGrayPdfProgress(90);
+      setGrayPdfProgressLabel('Preparando descarga...');
+
+      const blob = await response.blob();
+      const baseName = grayPdfFile.name.replace(/\.pdf$/i, '') || 'documento';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}_K.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      setIsGrayModalOpen(false);
+      setGrayPdfFile(null);
+      setFlattenGrayPdf(false);
+      setGrayPdfProgress(100);
+      setGrayPdfProgressLabel('');
+      setGrayPdfRisk(null);
+      showToast('PDF convertido a canal K y descargado.');
+    } catch (err) {
+      console.error('Gray PDF conversion error:', err);
+      const message = err instanceof Error ? err.message : 'Reintenta con otro PDF.';
+      showToast(`Error convirtiendo PDF: ${message}`);
+    } finally {
+      setIsConvertingGrayPdf(false);
+      window.setTimeout(() => {
+        setGrayPdfProgress(0);
+        setGrayPdfProgressLabel('');
+      }, 500);
+    }
+  };
+
   // High-precision auto-fit: Typst CLI compiles trial sizes and chooses the largest one that fits.
   const handleAutoFitFont = useCallback(async () => {
     try {
@@ -309,7 +439,7 @@ export default function App() {
 
     try {
       setIsExporting(true);
-      showToast('Generando PDF vectorial ultra nítido en escala de grises (DeviceGray)...');
+      showToast('Generando PDF vectorial ultra nítido en escala de grises...');
 
       await generateNoticePDF({
         config,
@@ -335,6 +465,7 @@ export default function App() {
         onLoadSample={handleLoadSample}
         onReset={handleReset}
         onExportPdf={handleExportPdf}
+        onOpenGrayPdfConverter={() => setIsGrayModalOpen(true)}
         onSaveNotice={handleSaveNotice}
         onOpenSavedNotices={() => setIsSavedNoticesOpen(true)}
         onExportNoticeJson={() => handleExportNoticeJson()}
@@ -500,6 +631,136 @@ export default function App() {
                 className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isGrayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4 text-white">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-emerald-300" />
+                <div>
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide">Convertir PDF a Grises</h2>
+                  <p className="text-xs text-slate-300">Ghostscript + ISOnewspaper26v4_gr.icc</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!isConvertingGrayPdf) {
+                    resetGrayPdfModal();
+                  }
+                }}
+                className="rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+                disabled={isConvertingGrayPdf}
+                title="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-5">
+              <label className="flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition-colors hover:border-emerald-400 hover:bg-emerald-50">
+                <Upload className="h-8 w-8 text-emerald-700" />
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {grayPdfFile ? grayPdfFile.name : 'Seleccionar PDF'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">El archivo se convertira a DeviceGray/K sin rasterizar textos ni imagenes</p>
+                </div>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  disabled={isConvertingGrayPdf}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setGrayPdfFile(file);
+                    setFlattenGrayPdf(false);
+                    setGrayPdfRisk(null);
+                    if (file) {
+                      void analyzeGrayPdfRisk(file);
+                    }
+                  }}
+                />
+              </label>
+
+              {isAnalyzingGrayPdf && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-900">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-700" />
+                  <span>Analizando transparencias, máscaras y efectos...</span>
+                </div>
+              )}
+
+              {grayPdfRisk?.hasRisk && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-xs text-amber-950">
+                  <div className="mb-2 flex items-center gap-2 font-extrabold">
+                    <AlertTriangle className="h-4 w-4 text-amber-700" />
+                    <span>Advertencia para RIP antiguo</span>
+                  </div>
+                  <div className="space-y-1">
+                    {grayPdfRisk.warnings.slice(0, 4).map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </div>
+                  <p className="mt-2 font-semibold">Se recomienda acoplar transparencias antes de enviar a rotativa.</p>
+                </div>
+              )}
+
+              {isConvertingGrayPdf && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
+                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-emerald-950">
+                    <span>{grayPdfProgressLabel || 'Procesando PDF...'}</span>
+                    <span>{Math.max(1, Math.min(99, grayPdfProgress))}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-emerald-200">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all duration-500 ease-out"
+                      style={{ width: `${Math.max(6, Math.min(99, grayPdfProgress))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                Usa el perfil ICC local si esta disponible en el directorio actual. La salida preserva vectores, fuentes e imagenes; solo convierte el color a grises para imprenta.
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={flattenGrayPdf}
+                  disabled={isConvertingGrayPdf}
+                  onChange={(event) => setFlattenGrayPdf(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600 disabled:opacity-50"
+                />
+                <span>
+                  <span className="block font-bold text-slate-900">Acoplar transparencias para RIP antiguo</span>
+                  <span className="mt-0.5 block text-slate-500">Usa PDF 1.3 a 1200 dpi, sin reducir imagenes. Activar solo si la imprenta lo pide.</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+              <button
+                onClick={() => {
+                  resetGrayPdfModal();
+                }}
+                disabled={isConvertingGrayPdf}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConvertGrayPdf}
+                disabled={!grayPdfFile || isConvertingGrayPdf}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {isConvertingGrayPdf ? 'Convirtiendo...' : 'Convertir y descargar'}
               </button>
             </div>
           </div>
