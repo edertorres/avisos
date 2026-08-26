@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X } from 'lucide-react';
+import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X, Save, FolderOpen, FileDown, FileUp } from 'lucide-react';
 import manualText from '../../MANUAL_USUARIO.md?raw';
 
 interface HeaderProps {
   onLoadSample: () => void;
   onReset: () => void;
   onExportPdf: (type: 'single-exact' | 'a4-sheet') => void;
+  onSaveNotice: () => void;
+  onOpenSavedNotices: () => void;
+  onExportNoticeJson: () => void;
+  onImportNoticeJson: () => void;
   isExporting: boolean;
   isOverflowing: boolean;
 }
@@ -75,6 +79,10 @@ export const Header: React.FC<HeaderProps> = ({
   onLoadSample,
   onReset,
   onExportPdf,
+  onSaveNotice,
+  onOpenSavedNotices,
+  onExportNoticeJson,
+  onImportNoticeJson,
   isExporting,
   isOverflowing,
 }) => {
@@ -125,6 +133,40 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
             <span className="hidden sm:inline">Ejemplo</span>
+          </button>
+
+          <button
+            onClick={onSaveNotice}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 transition-colors"
+            title="Guardar el anuncio actual en este navegador"
+          >
+            <Save className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="hidden sm:inline">Guardar</span>
+          </button>
+
+          <button
+            onClick={onOpenSavedNotices}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
+            title="Ver anuncios guardados"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">Guardados</span>
+          </button>
+
+          <button
+            onClick={onExportNoticeJson}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
+            title="Exportar el anuncio actual como JSON"
+          >
+            <FileDown className="w-3.5 h-3.5 text-slate-500" />
+          </button>
+
+          <button
+            onClick={onImportNoticeJson}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
+            title="Importar anuncio desde JSON"
+          >
+            <FileUp className="w-3.5 h-3.5 text-slate-500" />
           </button>
 
           <button
