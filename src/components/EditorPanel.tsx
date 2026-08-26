@@ -240,32 +240,56 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     onValueChange: (value: number) => void,
     min: number,
     max: number
-  ) => (
-    <div className="flex items-center justify-between gap-2 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200">
-      <span className="text-xs text-slate-600 font-extrabold uppercase">{label}</span>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onValueChange(Math.max(min, Number((value - 0.5).toFixed(1))))}
-          className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
-          title={`Reducir ${label.toLowerCase()}`}
-        >
-          <Minus className="w-3 h-3" />
-        </button>
-        <span className="font-mono font-extrabold text-slate-950 px-1 min-w-14 text-center text-sm">
-          {value}pt
-        </span>
-        <button
-          type="button"
-          onClick={() => onValueChange(Math.min(max, Number((value + 0.5).toFixed(1))))}
-          className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
-          title={`Aumentar ${label.toLowerCase()}`}
-        >
-          <Plus className="w-3 h-3" />
-        </button>
+  ) => {
+    const commitValue = (rawValue: string) => {
+      const parsed = parseFloat(rawValue.replace(',', '.'));
+      if (Number.isNaN(parsed)) return;
+      const clamped = Math.min(max, Math.max(min, parsed));
+      onValueChange(Number(clamped.toFixed(2)));
+    };
+
+    return (
+      <div className="flex items-center justify-between gap-2 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200">
+        <span className="text-xs text-slate-600 font-extrabold uppercase">{label}</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onValueChange(Math.max(min, Number((value - 0.5).toFixed(1))))}
+            className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
+            title={`Reducir ${label.toLowerCase()}`}
+          >
+            <Minus className="w-3 h-3" />
+          </button>
+          <div className="relative w-20">
+            <input
+              type="text"
+              inputMode="decimal"
+              defaultValue={value.toString()}
+              key={`${label}-${value}`}
+              onBlur={(e) => commitValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+              }}
+              className="w-full rounded border border-slate-300 bg-white py-1 pr-6 pl-2 text-center font-mono text-sm font-extrabold text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 select-none text-xs font-extrabold text-slate-500 pointer-events-none">
+              pt
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onValueChange(Math.min(max, Number((value + 0.5).toFixed(1))))}
+            className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
+            title={`Aumentar ${label.toLowerCase()}`}
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const handleAddCustomSizeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -525,11 +549,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                       label="Ancho del Logo"
                       value={config.logoWidthMm}
                       onChange={(logoWidthMm) => onChange({ logoWidthMm })}
-                      min={5}
-                      max={30}
-                      step={1}
+                      min={0.1}
+                      max={1000}
+                      step={0.1}
                       unit="mm"
-                      presets={[8, 10, 12, 15, 18]}
+                      decimals={1}
+                      presets={[8, 10, 12, 15, 18, 25, 40]}
                       icon={<ImageIcon className="w-3 h-3 text-slate-500" />}
                     />
 

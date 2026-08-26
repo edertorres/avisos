@@ -6,11 +6,13 @@ import { EditorPanel } from './components/EditorPanel';
 import { NoticePreview } from './components/NoticePreview';
 import { generateNoticePDF } from './utils/pdfGenerator';
 import { calculateAutoFitFont } from './utils/autoFitAlgorithm';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function App() {
   const [config, setConfig] = useState<NoticeConfig>(DEFAULT_NOTICE_CONFIG);
   const [sizes, setSizes] = useState<SizeOption[]>(INITIAL_SIZES);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isEditorPanelCollapsed, setIsEditorPanelCollapsed] = useState<boolean>(false);
   const [overflowStatus, setOverflowStatus] = useState<OverflowStatus>({
     isOverflowing: false,
     overflowHeightPx: 0,
@@ -118,22 +120,46 @@ export default function App() {
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 min-h-0 max-w-[1600px] w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-y-auto lg:overflow-hidden">
+      <main className="flex-1 min-h-0 w-full p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-y-auto lg:overflow-hidden">
         {/* Left Control Panel (5 cols desktop - Independent internal scroll) */}
-        <div className="order-2 lg:order-1 lg:col-span-5 h-[500px] lg:h-full min-h-0 flex flex-col overflow-hidden">
-          <EditorPanel
-            config={config}
-            onChange={handleConfigChange}
-            sizes={sizes}
-            onAddCustomSize={handleAddCustomSize}
-            onDeleteCustomSize={handleDeleteCustomSize}
-            onAutoFitFont={handleAutoFitFont}
-            isOverflowing={overflowStatus.isOverflowing}
-          />
-        </div>
+        {!isEditorPanelCollapsed && (
+          <div className="order-2 lg:order-1 lg:col-span-5 h-[500px] lg:h-full min-h-0 flex flex-col overflow-hidden relative">
+            <button
+              type="button"
+              onClick={() => setIsEditorPanelCollapsed(true)}
+              className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              title="Ocultar panel lateral"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+            <EditorPanel
+              config={config}
+              onChange={handleConfigChange}
+              sizes={sizes}
+              onAddCustomSize={handleAddCustomSize}
+              onDeleteCustomSize={handleDeleteCustomSize}
+              onAutoFitFont={handleAutoFitFont}
+              isOverflowing={overflowStatus.isOverflowing}
+            />
+          </div>
+        )}
 
         {/* Right Preview Panel (7 cols desktop - Static anchored canvas) */}
-        <div className="order-1 lg:order-2 lg:col-span-7 h-[450px] sm:h-[550px] lg:h-full min-h-0 flex flex-col overflow-hidden">
+        <div
+          className={`order-1 lg:order-2 ${
+            isEditorPanelCollapsed ? 'lg:col-span-12' : 'lg:col-span-7'
+          } h-[450px] sm:h-[550px] lg:h-full min-h-0 flex flex-col overflow-hidden relative`}
+        >
+          {isEditorPanelCollapsed && (
+            <button
+              type="button"
+              onClick={() => setIsEditorPanelCollapsed(false)}
+              className="absolute left-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 shadow-md transition-colors hover:bg-slate-100"
+              title="Mostrar panel lateral"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          )}
           <NoticePreview
             config={config}
             onConfigChange={handleConfigChange}

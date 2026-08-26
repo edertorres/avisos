@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 
 interface InDesignStepperProps {
@@ -27,23 +27,41 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
   icon,
 }) => {
   const dec = decimals ?? (step < 0.1 ? 2 : step < 1 ? 1 : 0);
+  const formatValue = (nextValue: number) => Number(nextValue.toFixed(dec)).toString();
+  const [draftValue, setDraftValue] = useState<string>(formatValue(value));
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraftValue(formatValue(value));
+    }
+  }, [value, dec, isEditing]);
+
+  const clampValue = (nextValue: number) => Math.min(max, Math.max(min, nextValue));
+
+  const commitDraftValue = () => {
+    const normalized = draftValue.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    if (Number.isNaN(parsed)) {
+      setDraftValue(formatValue(value));
+      return;
+    }
+
+    const next = Number(clampValue(parsed).toFixed(4));
+    onChange(next);
+    setDraftValue(formatValue(next));
+  };
 
   const handleDecrement = () => {
     const next = Math.max(min, Number((value - step).toFixed(4)));
     onChange(next);
+    setDraftValue(formatValue(next));
   };
 
   const handleIncrement = () => {
     const next = Math.min(max, Number((value + step).toFixed(4)));
     onChange(next);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseFloat(e.target.value);
-    if (!isNaN(parsed)) {
-      const clamped = Math.min(max, Math.max(min, parsed));
-      onChange(clamped);
-    }
+    setDraftValue(formatValue(next));
   };
 
   return (
@@ -71,12 +89,24 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
 
         <div className="relative flex-1 flex items-center">
           <input
-            type="number"
-            step={step}
-            min={min}
-            max={max}
-            value={Number(value.toFixed(dec))}
-            onChange={handleInputChange}
+            type="text"
+            inputMode="decimal"
+            value={draftValue}
+            onChange={(e) => setDraftValue(e.target.value)}
+            onFocus={() => setIsEditing(true)}
+            onBlur={() => {
+              commitDraftValue();
+              setIsEditing(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur();
+              }
+              if (e.key === 'Escape') {
+                setDraftValue(formatValue(value));
+                e.currentTarget.blur();
+              }
+            }}
             className="w-full text-center text-sm font-mono font-extrabold text-slate-950 bg-white border border-slate-300 rounded py-1.5 px-1 focus:ring-2 focus:ring-slate-900 focus:outline-none"
           />
           {unit && (
@@ -105,7 +135,10 @@ export const InDesignStepper: React.FC<InDesignStepperProps> = ({
               <button
                 key={p}
                 type="button"
-                onClick={() => onChange(p)}
+                onClick={() => {
+                  onChange(p);
+                  setDraftValue(formatValue(p));
+                }}
                 className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border transition-all shrink-0 ${
                   isSelected
                     ? 'bg-slate-900 text-white font-bold border-slate-900'

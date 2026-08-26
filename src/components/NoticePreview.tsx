@@ -184,6 +184,12 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
   const recommendedNextSize = availableSizes.find(
     (s) => s.widthCm === config.size.widthCm && s.heightCm > config.size.heightCm
   );
+  const commitBodyFontSize = (rawValue: string) => {
+    const parsed = parseFloat(rawValue.replace(',', '.'));
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.min(16, Math.max(4, parsed));
+    onConfigChange({ bodyFontSizePt: Number(clamped.toFixed(2)) });
+  };
 
   return (
     <div className="bg-slate-100 rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-inner">
@@ -288,15 +294,32 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
           <div className="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200">
             <span className="text-xs text-slate-600 font-extrabold uppercase">Letra</span>
             <button
-              onClick={() => onConfigChange({ bodyFontSizePt: Math.max(4.5, Number((config.bodyFontSizePt - 0.25).toFixed(2))) })}
+              onClick={() => onConfigChange({ bodyFontSizePt: Math.max(4, Number((config.bodyFontSizePt - 0.25).toFixed(2))) })}
               className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
               title="Reducir letra"
             >
               <Minus className="w-3 h-3" />
             </button>
-            <span className="font-mono font-extrabold text-slate-950 px-1 min-w-14 text-center text-sm">{config.bodyFontSizePt}pt</span>
+            <div className="relative w-20">
+              <input
+                type="text"
+                inputMode="decimal"
+                defaultValue={config.bodyFontSizePt.toString()}
+                key={`quick-body-font-${config.bodyFontSizePt}`}
+                onBlur={(e) => commitBodyFontSize(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="w-full rounded border border-slate-300 bg-white py-1 pr-6 pl-2 text-center font-mono text-sm font-extrabold text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 select-none text-xs font-extrabold text-slate-500 pointer-events-none">
+                pt
+              </span>
+            </div>
             <button
-              onClick={() => onConfigChange({ bodyFontSizePt: Math.min(14, Number((config.bodyFontSizePt + 0.25).toFixed(2))) })}
+              onClick={() => onConfigChange({ bodyFontSizePt: Math.min(16, Number((config.bodyFontSizePt + 0.25).toFixed(2))) })}
               className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-slate-200"
               title="Aumentar letra"
             >
@@ -375,7 +398,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
       </div>
 
       {/* Main Preview Work Area */}
-      <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-start justify-center pt-8 pb-16 relative bg-slate-100">
+      <div className="flex-1 overflow-auto overscroll-contain p-4 sm:p-6 pt-8 pb-16 relative bg-slate-100">
         <div
           className="absolute inset-0 opacity-10 pointer-events-none"
           style={{
@@ -385,7 +408,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
         />
 
         {/* Notice Card Frame Container */}
-        <div className="relative transition-all duration-200">
+        <div className="relative z-10 w-max min-w-max transition-all duration-200 mx-auto">
           <div className="absolute -top-6 left-0 right-0 flex justify-between text-xs font-mono text-slate-500 font-bold">
             <span>0 cm</span>
             <span>{config.size.widthCm} cm</span>
