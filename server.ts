@@ -104,25 +104,7 @@ async function writeLogoAssetForTypst(tempDir: string, logo: ImageAsset): Promis
   const originalName = logo.path.slice(1);
   const originalPath = path.join(tempDir, originalName);
   await fs.writeFile(originalPath, logo.bytes);
-
-  if (logo.extension === 'svg') {
-    return logo.path;
-  }
-
-  const grayPath = path.join(tempDir, 'logo-gray.png');
-  await execFileAsync('magick', [
-    originalPath,
-    '-colorspace',
-    'Gray',
-    '-alpha',
-    'on',
-    grayPath,
-  ], {
-    timeout: 20000,
-    maxBuffer: 1024 * 1024 * 5,
-  });
-
-  return '/logo-gray.png';
+  return logo.path;
 }
 
 function extensionFromUrl(url: string): string | null {
