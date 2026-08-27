@@ -6,8 +6,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { NoticeConfig } from './src/types';
+import { NoticeConfig, SizeOption } from './src/types';
 import { generateTypstMarkup } from './src/utils/typstGenerator';
+import { chooseAutoLineHeight } from './src/utils/typographyMetrics';
 import { WRAP_IT_TYP_SOURCE } from './src/utils/wrapItSource';
 
 const execFileAsync = promisify(execFile);
@@ -40,6 +41,7 @@ const PT_PER_CM = 28.3465;
 interface AutoFitResult {
   changes: Partial<NoticeConfig>;
   message: string;
+  suggestedSize?: SizeOption;
 }
 
 interface FitProbe {
@@ -165,6 +167,40 @@ async function resolveGrayIccProfile(): Promise<string | null> {
   return null;
 }
 
+function postScriptString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+async function writePdfx1aDefinition(tempDir: string, grayProfile: string): Promise<string> {
+  const definitionPath = path.join(tempDir, 'PDFX-1a-gray.ps');
+  const escapedProfilePath = postScriptString(grayProfile);
+  const definition = `%!
+[/GTS_PDFXVersion (PDF/X-1a:2001)
+ /Title (Aviso en escala de grises)
+ /Trapped /False
+/DOCINFO pdfmark
+
+[/_objdef {icc_PDFX} /type /stream /OBJ pdfmark
+[{icc_PDFX} <</N 1>> /PUT pdfmark
+[{icc_PDFX} (${escapedProfilePath}) (r) file /PUT pdfmark
+
+[/_objdef {OutputIntent_PDFX} /type /dict /OBJ pdfmark
+[{OutputIntent_PDFX} <<
+ /Type /OutputIntent
+ /S /GTS_PDFX
+ /OutputCondition (Prensa en escala de grises)
+ /Info (DeviceGray con perfil ICC para prensa)
+ /OutputConditionIdentifier (ISOnewspaper26v4_gr)
+ /RegistryName (http://www.color.org)
+ /DestOutputProfile {icc_PDFX}
+>> /PUT pdfmark
+[{Catalog} <</OutputIntents [ {OutputIntent_PDFX} ]>> /PUT pdfmark
+`;
+
+  await fs.writeFile(definitionPath, definition, 'utf8');
+  return definitionPath;
+}
+
 function parseInkCoverage(stdout: string): InkCoverage[] {
   return stdout
     .split('\n')
@@ -241,15 +277,20 @@ async function verifyGrayPdfWithInkcov(outputPath: string): Promise<void> {
 async function convertPdfToDeviceGrayWithGhostscript(
   inputPath: string,
   outputPath: string,
-  mode: GrayConversionMode = 'preserve'
+  mode: GrayConversionMode = 'flatten'
 ): Promise<void> {
   const grayProfile = await resolveGrayIccProfile();
   const compatibilityLevel = mode === 'flatten' ? '1.3' : '1.7';
   const renderResolution = mode === 'flatten' ? '1200' : '300';
+  const pdfxDefinitionPath = mode === 'flatten' && grayProfile
+    ? await writePdfx1aDefinition(path.dirname(outputPath), grayProfile)
+    : null;
   const gsArgs = [
     '-sDEVICE=pdfwrite',
     `-dCompatibilityLevel=${compatibilityLevel}`,
     `-r${renderResolution}`,
+    ...(pdfxDefinitionPath ? ['-dPDFX=1'] : []),
+    ...(pdfxDefinitionPath ? [`--permit-file-read=${grayProfile}`] : []),
     '-dPDFSETTINGS=/prepress',
     '-sColorConversionStrategy=Gray',
     '-dProcessColorModel=/DeviceGray',
@@ -266,6 +307,7 @@ async function convertPdfToDeviceGrayWithGhostscript(
     '-dBATCH',
     ...(grayProfile ? [`-sDefaultGrayProfile=${grayProfile}`] : []),
     `-sOutputFile=${outputPath}`,
+    ...(pdfxDefinitionPath ? [pdfxDefinitionPath] : []),
     inputPath,
   ];
 
@@ -296,13 +338,6 @@ function fixSvgDimensions(svgString: string): string {
   result = result.replace(/height="[\d.]+(pt|px|mm|cm)?"/, 'height="100%"');
 
   return result;
-}
-
-function chooseLineHeight(bodyPt: number): number {
-  if (bodyPt < 5.5) return 1.0;
-  if (bodyPt < 7.0) return 1.08;
-  if (bodyPt < 9.0) return 1.15;
-  return 1.25;
 }
 
 function parsePageHeightPt(svg: string, fallbackHeightCm: number): number {
@@ -364,9 +399,9 @@ function getScaledProbe(config: NoticeConfig, bodyPt: number): FitProbe {
   return {
     config,
     bodyPt: Number(bodyPt.toFixed(2)),
-    headerPt: Number(Math.max(5.0, Math.min(20.0, bodyPt * headerRatio)).toFixed(2)),
-    subheaderPt: Number(Math.max(4.5, Math.min(16.0, bodyPt * subheaderRatio)).toFixed(2)),
-    lineHeight: chooseLineHeight(bodyPt),
+    headerPt: Number(Math.max(6.0, Math.min(20.0, bodyPt * headerRatio)).toFixed(2)),
+    subheaderPt: Number(Math.max(6.0, Math.min(16.0, bodyPt * subheaderRatio)).toFixed(2)),
+    lineHeight: chooseAutoLineHeight(config.fontFamily, bodyPt),
   };
 }
 
@@ -380,8 +415,65 @@ async function fitsInTypst(probe: FitProbe): Promise<boolean> {
   return !detectOverflowFromTypstSvg(String(svg), probeConfig);
 }
 
-async function calculateAutoFitWithTypst(config: NoticeConfig): Promise<AutoFitResult> {
-  const minBodyPt = 4.0;
+function normalizeSizeOptions(value: unknown): SizeOption[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((size): size is SizeOption => (
+    size &&
+    typeof size === 'object' &&
+    typeof size.id === 'string' &&
+    typeof size.name === 'string' &&
+    typeof size.widthCm === 'number' &&
+    typeof size.heightCm === 'number' &&
+    size.widthCm > 0 &&
+    size.heightCm > 0
+  ));
+}
+
+function sortSuggestedSizes(config: NoticeConfig, availableSizes: SizeOption[]): SizeOption[] {
+  const currentArea = config.size.widthCm * config.size.heightCm;
+
+  return availableSizes
+    .filter((size) => {
+      const area = size.widthCm * size.heightCm;
+      const isSameSize = size.widthCm === config.size.widthCm && size.heightCm === config.size.heightCm;
+      return !isSameSize && area > currentArea;
+    })
+    .sort((a, b) => {
+      const aSameWidth = a.widthCm === config.size.widthCm ? 0 : 1;
+      const bSameWidth = b.widthCm === config.size.widthCm ? 0 : 1;
+      if (aSameWidth !== bSameWidth) return aSameWidth - bSameWidth;
+      return (a.widthCm * a.heightCm) - (b.widthCm * b.heightCm);
+    });
+}
+
+async function findSuggestedNoticeSize(config: NoticeConfig, minProbe: FitProbe, availableSizes: SizeOption[]): Promise<SizeOption | undefined> {
+  const candidates = sortSuggestedSizes(config, availableSizes);
+
+  for (const size of candidates) {
+    const probe = { ...minProbe, config: { ...config, size } };
+    if (await fitsInTypst(probe)) return size;
+  }
+
+  const maxExtraHeightCm = 12;
+  for (let heightCm = config.size.heightCm + 0.5; heightCm <= config.size.heightCm + maxExtraHeightCm; heightCm += 0.5) {
+    const roundedHeight = Number(heightCm.toFixed(1));
+    const customSize: SizeOption = {
+      id: `${config.size.widthCm}x${roundedHeight}-autofit`,
+      name: `${config.size.widthCm} x ${roundedHeight} cm (Sugerido)`,
+      widthCm: config.size.widthCm,
+      heightCm: roundedHeight,
+      isCustom: true,
+    };
+    const probe = { ...minProbe, config: { ...config, size: customSize } };
+    if (await fitsInTypst(probe)) return customSize;
+  }
+
+  return undefined;
+}
+
+async function calculateAutoFitWithTypst(config: NoticeConfig, availableSizes: SizeOption[] = []): Promise<AutoFitResult> {
+  const minBodyPt = 6.0;
   const maxBodyPt = 14.0;
   const currentBodyPt = Math.max(minBodyPt, Math.min(maxBodyPt, config.bodyFontSizePt));
 
@@ -389,6 +481,11 @@ async function calculateAutoFitWithTypst(config: NoticeConfig): Promise<AutoFitR
   const minFits = await fitsInTypst(minProbe);
 
   if (!minFits) {
+    const suggestedSize = await findSuggestedNoticeSize(config, minProbe, availableSizes);
+    const sizeMessage = suggestedSize
+      ? ` Usa un aviso mayor: ${suggestedSize.widthCm} x ${suggestedSize.heightCm} cm.`
+      : ' Crea un aviso de mayor alto o reduce contenido.';
+
     return {
       changes: {
         bodyFontSizePt: minProbe.bodyPt,
@@ -396,7 +493,8 @@ async function calculateAutoFitWithTypst(config: NoticeConfig): Promise<AutoFitR
         subheaderFontSizePt: minProbe.subheaderPt,
         lineHeight: minProbe.lineHeight,
       },
-      message: 'El texto no cabe ni con la fuente mínima. Reduce contenido o aumenta el alto del aviso.',
+      suggestedSize,
+      message: `El texto no cabe con el mínimo legible de ${minBodyPt} pt e interlineado ${minProbe.lineHeight.toFixed(2)}.${sizeMessage}`,
     };
   }
 
@@ -515,7 +613,7 @@ async function startServer() {
       const inputPath = path.join(tempDir, 'input.pdf');
       const outputPath = path.join(tempDir, 'output-gray.pdf');
       const requestedMode = String(req.header('x-gray-conversion-mode') || '');
-      const conversionMode: GrayConversionMode = requestedMode === 'flatten' ? 'flatten' : 'preserve';
+      const conversionMode: GrayConversionMode = requestedMode === 'preserve' ? 'preserve' : 'flatten';
       await fs.writeFile(inputPath, req.body);
       await convertPdfToDeviceGrayWithGhostscript(inputPath, outputPath, conversionMode);
 
@@ -562,13 +660,13 @@ async function startServer() {
 
   app.post('/api/typst/autofit', async (req, res) => {
     try {
-      const { config }: { config?: NoticeConfig } = req.body;
+      const { config, availableSizes }: { config?: NoticeConfig; availableSizes?: unknown } = req.body;
       if (!config) {
         res.status(400).json({ error: 'Falta config para calcular el auto-ajuste.' });
         return;
       }
 
-      const result = await calculateAutoFitWithTypst(config);
+      const result = await calculateAutoFitWithTypst(config, normalizeSizeOptions(availableSizes));
       res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error desconocido calculando el auto-ajuste.';

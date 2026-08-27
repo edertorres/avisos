@@ -75,7 +75,7 @@ En la seccion **Logo Escudo** puedes:
   - Derecha flotante.
   - Centrado arriba.
 
-La exportacion PDF se procesa con Ghostscript en escala de grises DeviceGray para que sea apta para impresion en rotativa. El texto y bordes se generan en negro desde Typst, y Ghostscript acopla transparencias y convierte el resultado final.
+La exportacion PDF se procesa con Ghostscript en escala de grises DeviceGray/K para que sea apta para impresion en rotativa. Para RIP antiguo, la conversion externa usa por defecto PDF 1.3 con transparencias acopladas; si esta disponible el perfil ICC gris local, se agrega intencion de salida PDF/X-1a:2001.
 
 ## Atributos Rapidos
 

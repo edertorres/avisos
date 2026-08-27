@@ -333,7 +333,7 @@ export const NoticePreview: React.FC<NoticePreviewProps> = ({
             <Rows3 className="w-3.5 h-3.5 text-emerald-700" />
             <span className="text-xs text-emerald-800 font-extrabold uppercase">Inter</span>
             <button
-              onClick={() => onConfigChange({ lineHeight: Math.max(0.85, Number((config.lineHeight - 0.02).toFixed(2))) })}
+              onClick={() => onConfigChange({ lineHeight: Math.max(1.1, Number((config.lineHeight - 0.02).toFixed(2))) })}
               className="p-1 hover:bg-white rounded text-slate-700 border border-transparent hover:border-emerald-200"
               title="Reducir interlineado"
             >

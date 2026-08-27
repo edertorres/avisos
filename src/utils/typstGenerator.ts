@@ -1,4 +1,5 @@
 import { NoticeConfig } from '../types';
+import { toTypstParagraphMetrics } from './typographyMetrics';
 
 /**
  * Escapes special characters for Typst markup
@@ -157,7 +158,7 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   const fontList = getTypstFontList(config.fontFamily);
   const boldFontList = getTypstBoldFontList(config.fontFamily);
   const textAlign = config.textAlign || 'justify';
-  const leadingEm = Math.max(-0.2, config.lineHeight - 1.0); // leading in Typst
+  const { leadingEm, spacingEm } = toTypstParagraphMetrics(config.fontFamily, config.lineHeight);
   const trackingMm = `${config.letterSpacingMm || 0}mm`;
   const borderWidth = `${Math.max(0.2, config.borderWidthPx || 0.5)}pt`;
   const marginMm = `${config.marginMm || 3}mm`;
@@ -167,7 +168,7 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   const bodyParSettings = `#set par(
     justify: ${textAlign === 'justify' ? 'true' : 'false'},
     leading: ${leadingEm.toFixed(3)}em,
-    spacing: ${leadingEm.toFixed(3)}em,
+    spacing: ${spacingEm.toFixed(3)}em,
   )`;
 
   const headerTitle = escapeTypstString(config.headerTitle);
@@ -284,7 +285,7 @@ ${formattedBody.trim()}`;
   #set par(
     justify: ${textAlign === 'justify' ? 'true' : 'false'},
     leading: ${leadingEm.toFixed(3)}em,
-    spacing: ${leadingEm.toFixed(3)}em,
+    spacing: ${spacingEm.toFixed(3)}em,
   )
 
   ${topLogo}${titlesBlock}${formattedBody.trim()}

@@ -634,7 +634,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 onChange={(e) => onChange({ headerTitle: e.target.value })}
                 onPaste={(e) => handleTitlePaste(e, 'headerTitle')}
                 placeholder="Ej: AVISO ÚNICO, EDICTO, CITACIÓN"
-                className="w-full text-sm font-bold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase"
+                className="w-full text-sm font-bold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none"
               />
               {renderSimpleFontSizeControl('Tamaño Título 1', config.headerFontSizePt, (headerFontSizePt) => onChange({ headerFontSizePt }), 5, 24)}
             </div>
@@ -649,7 +649,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 onChange={(e) => onChange({ subheaderTitle: e.target.value })}
                 onPaste={(e) => handleTitlePaste(e, 'subheaderTitle')}
                 placeholder="Ej: LA DIRECTORA DE TALENTO HUMANO DEL DEPARTAMENTO DE RISARALDA"
-                className="w-full text-sm font-semibold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none uppercase resize-none"
+                className="w-full text-sm font-semibold text-center border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:outline-none resize-none"
               />
               {renderSimpleFontSizeControl('Tamaño Título 2', config.subheaderFontSizePt, (subheaderFontSizePt) => onChange({ subheaderFontSizePt }), 4.5, 18)}
             </div>
@@ -891,11 +891,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 label="Interlineado"
                 value={config.lineHeight}
                 onChange={(lineHeight) => onChange({ lineHeight })}
-                min={0.85}
+                min={1.1}
                 max={1.8}
                 step={0.02}
                 unit=""
-                presets={[0.95, 1.0, 1.15, 1.25, 1.32]}
+                presets={[1.1, 1.15, 1.2, 1.25, 1.32]}
                 icon={<Grid className="w-3.5 h-3.5 text-slate-600" />}
               />
 

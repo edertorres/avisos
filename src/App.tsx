@@ -22,6 +22,15 @@ interface SavedNotice {
   updatedAt: string;
 }
 
+interface GeneratedLogEntry {
+  id: string;
+  generatedAt: string;
+  title: string;
+  filename: string;
+  exportType: 'single-exact' | 'a4-sheet';
+  config: NoticeConfig;
+}
+
 interface NoticeJsonPayload {
   schemaVersion: 1;
   exportedAt: string;
@@ -34,6 +43,8 @@ interface NoticeJsonPayload {
 
 const SAVED_NOTICES_KEY = 'avisos.savedNotices.v1';
 const CUSTOM_SIZES_KEY = 'avisos.customSizes.v1';
+const GENERATED_LOG_KEY = 'avisos.generatedLog.v1';
+const GENERATED_LOG_LIMIT = 200;
 
 function isNoticeConfig(value: unknown): value is NoticeConfig {
   if (!value || typeof value !== 'object') return false;
@@ -84,7 +95,7 @@ export default function App() {
   const [isGrayModalOpen, setIsGrayModalOpen] = useState<boolean>(false);
   const [isConvertingGrayPdf, setIsConvertingGrayPdf] = useState<boolean>(false);
   const [grayPdfFile, setGrayPdfFile] = useState<File | null>(null);
-  const [flattenGrayPdf, setFlattenGrayPdf] = useState<boolean>(false);
+  const [flattenGrayPdf, setFlattenGrayPdf] = useState<boolean>(true);
   const [grayPdfProgress, setGrayPdfProgress] = useState<number>(0);
   const [grayPdfProgressLabel, setGrayPdfProgressLabel] = useState<string>('');
   const [isAnalyzingGrayPdf, setIsAnalyzingGrayPdf] = useState<boolean>(false);
@@ -92,6 +103,8 @@ export default function App() {
   const [isEditorPanelCollapsed, setIsEditorPanelCollapsed] = useState<boolean>(false);
   const [savedNotices, setSavedNotices] = useState<SavedNotice[]>([]);
   const [isSavedNoticesOpen, setIsSavedNoticesOpen] = useState<boolean>(false);
+  const [generatedLog, setGeneratedLog] = useState<GeneratedLogEntry[]>([]);
+  const [isGeneratedLogOpen, setIsGeneratedLogOpen] = useState<boolean>(false);
   const [overflowStatus, setOverflowStatus] = useState<OverflowStatus>({
     isOverflowing: false,
     overflowHeightPx: 0,
@@ -109,6 +122,14 @@ export default function App() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           setSavedNotices(parsed.filter((item) => item && isNoticeConfig(item.config)));
+        }
+      }
+
+      const rawGeneratedLog = localStorage.getItem(GENERATED_LOG_KEY);
+      if (rawGeneratedLog) {
+        const parsedGeneratedLog = JSON.parse(rawGeneratedLog);
+        if (Array.isArray(parsedGeneratedLog)) {
+          setGeneratedLog(parsedGeneratedLog.filter((item) => item && isNoticeConfig(item.config)));
         }
       }
 
@@ -138,6 +159,12 @@ export default function App() {
     localStorage.setItem(SAVED_NOTICES_KEY, JSON.stringify(nextNotices));
   };
 
+  const persistGeneratedLog = (nextLog: GeneratedLogEntry[]) => {
+    const limitedLog = nextLog.slice(0, GENERATED_LOG_LIMIT);
+    setGeneratedLog(limitedLog);
+    localStorage.setItem(GENERATED_LOG_KEY, JSON.stringify(limitedLog));
+  };
+
   const persistCustomSizes = (nextSizes: SizeOption[]) => {
     const nextCustomSizes = nextSizes.filter((size) => size.isCustom);
     localStorage.setItem(CUSTOM_SIZES_KEY, JSON.stringify(nextCustomSizes));
@@ -158,6 +185,23 @@ export default function App() {
     const title = config.headerTitle.trim() || config.subheaderTitle.trim();
     const date = new Date().toLocaleDateString('es-CO');
     return title ? `${title} - ${date}` : `Aviso ${config.size.widthCm}x${config.size.heightCm} cm - ${date}`;
+  };
+
+  const getLogTitle = (noticeConfig: NoticeConfig) => {
+    return noticeConfig.headerTitle.trim() || noticeConfig.subheaderTitle.trim() || 'Aviso sin título';
+  };
+
+  const registerGeneratedNotice = (exportType: 'single-exact' | 'a4-sheet', filename: string) => {
+    const entry: GeneratedLogEntry = {
+      id: `generated-${Date.now()}`,
+      generatedAt: new Date().toISOString(),
+      title: getLogTitle(config),
+      filename,
+      exportType,
+      config,
+    };
+
+    persistGeneratedLog([entry, ...generatedLog]);
   };
 
   const handleSaveNotice = () => {
@@ -188,6 +232,48 @@ export default function App() {
     if (!window.confirm('¿Eliminar este anuncio guardado?')) return;
     persistSavedNotices(savedNotices.filter((notice) => notice.id !== id));
     showToast('Anuncio eliminado.');
+  };
+
+  const handleLoadGeneratedLogEntry = (entry: GeneratedLogEntry) => {
+    ensureSizeAvailable(entry.config.size);
+    setConfig(entry.config);
+    setIsGeneratedLogOpen(false);
+    showToast(`Aviso cargado desde historial: ${entry.title}`);
+  };
+
+  const handleExportGeneratedLogCsv = () => {
+    if (generatedLog.length === 0) {
+      showToast('No hay historial para exportar.');
+      return;
+    }
+
+    const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const rows = [
+      ['Fecha', 'Título', 'Archivo', 'Tipo', 'Tamaño cm', 'Fuente', 'Cuerpo pt', 'Interlineado', 'Título 1', 'Título 2'],
+      ...generatedLog.map((entry) => [
+        new Date(entry.generatedAt).toLocaleString('es-CO'),
+        entry.title,
+        entry.filename,
+        entry.exportType === 'single-exact' ? 'PDF tamaño real' : 'Hoja A4',
+        `${entry.config.size.widthCm} x ${entry.config.size.heightCm}`,
+        entry.config.fontFamily,
+        entry.config.bodyFontSizePt,
+        entry.config.lineHeight,
+        entry.config.headerTitle,
+        entry.config.subheaderTitle,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `historial-avisos-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('Historial exportado como CSV.');
   };
 
   const handleExportNoticeJson = (noticeToExport?: SavedNotice) => {
@@ -290,7 +376,7 @@ export default function App() {
   const resetGrayPdfModal = () => {
     setIsGrayModalOpen(false);
     setGrayPdfFile(null);
-    setFlattenGrayPdf(false);
+    setFlattenGrayPdf(true);
     setGrayPdfProgress(0);
     setGrayPdfProgressLabel('');
     setIsAnalyzingGrayPdf(false);
@@ -385,7 +471,7 @@ export default function App() {
 
       setIsGrayModalOpen(false);
       setGrayPdfFile(null);
-      setFlattenGrayPdf(false);
+      setFlattenGrayPdf(true);
       setGrayPdfProgress(100);
       setGrayPdfProgressLabel('');
       setGrayPdfRisk(null);
@@ -407,10 +493,14 @@ export default function App() {
   const handleAutoFitFont = useCallback(async () => {
     try {
       showToast('Calculando auto-ajuste con Typst...');
-      const result = await calculateAutoFitFont(config);
+      const result = await calculateAutoFitFont(config, sizes);
       if (!result) {
         showToast('No se pudo calcular el auto-ajuste.');
         return;
+      }
+
+      if (result.suggestedSize) {
+        ensureSizeAvailable(result.suggestedSize);
       }
 
       if (Object.keys(result.changes).length > 0) {
@@ -422,7 +512,7 @@ export default function App() {
       const message = err instanceof Error ? err.message : 'Revisa que Typst compile el aviso actual.';
       showToast(`No se pudo auto-ajustar: ${message}`);
     }
-  }, [config, handleConfigChange]);
+  }, [config, ensureSizeAvailable, handleConfigChange, sizes]);
 
   // Export PDF handler
   const handleExportPdf = async (exportType: 'single-exact' | 'a4-sheet') => {
@@ -440,15 +530,17 @@ export default function App() {
     try {
       setIsExporting(true);
       showToast('Generando PDF vectorial ultra nítido en escala de grises...');
+      const filename = `aviso_${config.size.widthCm}x${config.size.heightCm}cm_${Date.now()}.pdf`;
 
       await generateNoticePDF({
         config,
         widthCm: config.size.widthCm,
         heightCm: config.size.heightCm,
-        filename: `aviso_${config.size.widthCm}x${config.size.heightCm}cm_${Date.now()}.pdf`,
+        filename,
         exportType,
       });
 
+      registerGeneratedNotice(exportType, filename);
       showToast('¡PDF generado y descargado con éxito!');
     } catch (err) {
       console.error('PDF export error:', err);
@@ -468,6 +560,7 @@ export default function App() {
         onOpenGrayPdfConverter={() => setIsGrayModalOpen(true)}
         onSaveNotice={handleSaveNotice}
         onOpenSavedNotices={() => setIsSavedNoticesOpen(true)}
+        onOpenGeneratedLog={() => setIsGeneratedLogOpen(true)}
         onExportNoticeJson={() => handleExportNoticeJson()}
         onImportNoticeJson={() => noticeJsonInputRef.current?.click()}
         isExporting={isExporting}
@@ -637,6 +730,85 @@ export default function App() {
         </div>
       )}
 
+      {isGeneratedLogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4 text-white">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-emerald-300" />
+                <div>
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide">Historial de PDFs</h2>
+                  <p className="text-xs text-slate-300">Registro automático local de avisos generados</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGeneratedLogOpen(false)}
+                className="rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+                title="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {generatedLog.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+                  <p className="text-sm font-bold text-slate-800">Aún no hay PDFs registrados.</p>
+                  <p className="mt-1 text-xs text-slate-500">El historial se crea automáticamente cuando una exportación termina bien.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {generatedLog.map((entry) => {
+                    const generatedAt = new Date(entry.generatedAt).toLocaleString('es-CO');
+                    return (
+                      <div key={entry.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-sm font-black text-slate-900">{entry.title}</h3>
+                            <p className="mt-1 text-xs font-semibold text-slate-500">
+                              {entry.config.size.widthCm} × {entry.config.size.heightCm} cm · {entry.exportType === 'single-exact' ? 'PDF tamaño real' : 'Hoja A4'} · {generatedAt}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {entry.filename} · {entry.config.fontFamily} · cuerpo {entry.config.bodyFontSizePt} pt · inter {entry.config.lineHeight.toFixed(2)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadGeneratedLogEntry(entry)}
+                            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+                          >
+                            Cargar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={handleExportGeneratedLogCsv}
+                  disabled={generatedLog.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGeneratedLogOpen(false)}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
+                >
+                  Cerrar
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isGrayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
@@ -669,7 +841,7 @@ export default function App() {
                   <p className="text-sm font-bold text-slate-900">
                     {grayPdfFile ? grayPdfFile.name : 'Seleccionar PDF'}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">El archivo se convertira a DeviceGray/K sin rasterizar textos ni imagenes</p>
+                  <p className="mt-1 text-xs text-slate-500">El archivo se convertira a DeviceGray/K en PDF 1.3 para prensa</p>
                 </div>
                 <input
                   type="file"
@@ -679,7 +851,7 @@ export default function App() {
                   onChange={(event) => {
                     const file = event.target.files?.[0] || null;
                     setGrayPdfFile(file);
-                    setFlattenGrayPdf(false);
+                    setFlattenGrayPdf(true);
                     setGrayPdfRisk(null);
                     if (file) {
                       void analyzeGrayPdfRisk(file);
@@ -726,7 +898,7 @@ export default function App() {
               )}
 
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                Usa el perfil ICC local si esta disponible en el directorio actual. La salida preserva vectores, fuentes e imagenes; solo convierte el color a grises para imprenta.
+                Usa el perfil ICC local si esta disponible. En modo RIP antiguo genera PDF/X-1a:2001 sobre PDF 1.3; si falta el perfil, mantiene PDF 1.3 DeviceGray.
               </div>
 
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
@@ -739,7 +911,7 @@ export default function App() {
                 />
                 <span>
                   <span className="block font-bold text-slate-900">Acoplar transparencias para RIP antiguo</span>
-                  <span className="mt-0.5 block text-slate-500">Usa PDF 1.3 a 1200 dpi, sin reducir imagenes. Activar solo si la imprenta lo pide.</span>
+                  <span className="mt-0.5 block text-slate-500">Usa PDF 1.3 a 1200 dpi, acopla transparencias y evita PDF 1.7.</span>
                 </span>
               </label>
             </div>

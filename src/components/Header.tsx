@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X, Upload, Save, FolderOpen, FileDown, FileUp } from 'lucide-react';
+import { FileText, Download, RotateCcw, Sparkles, Printer, AlertTriangle, BookOpen, X, Upload, Save, FolderOpen, FileDown, FileUp, History } from 'lucide-react';
 import manualText from '../../MANUAL_USUARIO.md?raw';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenGrayPdfConverter: () => void;
   onSaveNotice: () => void;
   onOpenSavedNotices: () => void;
+  onOpenGeneratedLog: () => void;
   onExportNoticeJson: () => void;
   onImportNoticeJson: () => void;
   isExporting: boolean;
@@ -83,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGrayPdfConverter,
   onSaveNotice,
   onOpenSavedNotices,
+  onOpenGeneratedLog,
   onExportNoticeJson,
   onImportNoticeJson,
   isExporting,
@@ -153,6 +155,15 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden sm:inline">Guardados</span>
+          </button>
+
+          <button
+            onClick={onOpenGeneratedLog}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors"
+            title="Ver historial de PDFs generados"
+          >
+            <History className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">Historial</span>
           </button>
 
           <button

@@ -21,7 +21,7 @@ Manual de usuario: [MANUAL_USUARIO.md](MANUAL_USUARIO.md)
 3. Run the app:
    `npm run dev`
 
-The local server exposes `/api/typst/compile`. It uses `typst compile` to render SVG previews and an initial PDF, then Ghostscript (`gs`) converts PDF exports to flattened DeviceGray output for print. If `ISOnewspaper26v4_gr.icc` is available in the project/current directory, or `GRAY_ICC_PROFILE` points to an ICC file, that profile is used for the gray conversion.
+The local server exposes `/api/typst/compile`. It uses `typst compile` to render SVG previews and an initial PDF, then Ghostscript (`gs`) converts PDF exports to flattened DeviceGray output for print. The `/api/pdf/convert-gray` endpoint defaults to the legacy RIP path: PDF 1.3, flattened transparency and DeviceGray/K output. If `ISOnewspaper26v4_gr.icc` is available in the project/current directory, or `GRAY_ICC_PROFILE` points to an ICC file, that profile is embedded as a PDF/X-1a:2001 output intent for the gray conversion.
 
 ## Deploy
 
