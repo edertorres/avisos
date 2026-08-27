@@ -1,6 +1,9 @@
 import { NoticeConfig } from '../types';
 import { toTypstParagraphMetrics } from './typographyMetrics';
 
+const PT_PER_CM = 28.3465;
+const PT_PER_MM = 2.83465;
+
 /**
  * Escapes special characters for Typst markup
  */
@@ -37,6 +40,52 @@ function preserveLegalNoBreaks(escapedText: string): string {
 
 function formatTypstTextSegment(str: string): string {
   return preserveLegalNoBreaks(escapeTypstString(str));
+}
+
+function averageCharWidthEm(fontFamily: string): number {
+  if (fontFamily.includes('Roboto Condensed') || fontFamily.includes('Narrow') || fontFamily.includes('Arial Narrow')) return 0.43;
+  if (fontFamily.includes('Courier')) return 0.6;
+  if (fontFamily.includes('Tinos') || fontFamily.includes('Times') || fontFamily.includes('Lora') || fontFamily.includes('Georgia')) return 0.5;
+  return 0.48;
+}
+
+function splitBodyTextForSideLogo(config: NoticeConfig): { sideText: string; restText: string } {
+  const words = (config.bodyText || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (words.length === 0) return { sideText: '', restText: '' };
+
+  const innerWidthPt = (config.size.widthCm * PT_PER_CM) - (config.marginMm * 2 * PT_PER_MM);
+  const logoWidthPt = (config.logoWidthMm || 12) * PT_PER_MM;
+  const gutterPt = 2.5 * PT_PER_MM;
+  const sideColumnWidthPt = Math.max(24, innerWidthPt - logoWidthPt - gutterPt);
+  const lineStepPt = Math.max(1, config.bodyFontSizePt * config.lineHeight);
+  const estimatedLogoHeightPt = logoWidthPt * 1.25;
+  const sideLineCount = Math.max(2, Math.min(8, Math.ceil(estimatedLogoHeightPt / lineStepPt)));
+  const charsPerLine = Math.max(8, Math.floor(sideColumnWidthPt / (config.bodyFontSizePt * averageCharWidthEm(config.fontFamily))));
+  const targetChars = charsPerLine * sideLineCount;
+
+  let charCount = 0;
+  let splitIndex = words.length;
+  for (let index = 0; index < words.length; index += 1) {
+    charCount += words[index].replace(/\*\*/g, '').length + 1;
+    if (charCount >= targetChars) {
+      splitIndex = Math.min(words.length, index + 1);
+      break;
+    }
+  }
+
+  if (splitIndex >= words.length) {
+    return { sideText: words.join(' '), restText: '' };
+  }
+
+  let sideText = words.slice(0, splitIndex).join(' ');
+  let restText = words.slice(splitIndex).join(' ');
+  const sideBoldMarks = (sideText.match(/\*\*/g) || []).length;
+  if (sideBoldMarks % 2 !== 0) {
+    sideText += '**';
+    restText = `**${restText}`;
+  }
+
+  return { sideText, restText };
 }
 
 /**
@@ -165,8 +214,9 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   const logoWidthMm = `${config.logoWidthMm || 12}mm`;
   const logoPosition = config.logoPosition || 'left';
   const logoVerticalAlign = config.logoVerticalAlign || 'body';
+  const usesSideLogoWrap = hasLogoFile && (logoPosition === 'left' || logoPosition === 'right') && logoVerticalAlign !== 'titles-top';
   const bodyParSettings = `#set par(
-    justify: ${textAlign === 'justify' ? 'true' : 'false'},
+    justify: ${textAlign === 'justify' && !usesSideLogoWrap ? 'true' : 'false'},
     leading: ${leadingEm.toFixed(3)}em,
     spacing: ${spacingEm.toFixed(3)}em,
   )`;
@@ -189,17 +239,26 @@ export function generateSingleNoticeBlock(config: NoticeConfig, hasLogoFile: boo
   }
 
   if (hasLogoFile && (logoPosition === 'left' || logoPosition === 'right')) {
-    const wrapAlign = logoPosition === 'right' ? 'top + right' : 'top + left';
     const logoImage = typstLogoImage(logoPath, logoWidthMm);
-    const wrappedBodyText = `${bodyParSettings}
-${formattedBody.trim()}`;
-    const wrapBody = `${titlesBlock}#wrap-content(
-    ${logoImage},
-    [${wrappedBodyText}],
-    align: ${wrapAlign},
+    const { sideText, restText } = splitBodyTextForSideLogo(config);
+    const formattedSideText = formatTypstBodyText(sideText, config.boldKeywords, boldFontList);
+    const formattedRestText = formatTypstBodyText(restText, config.boldKeywords, boldFontList);
+    const bodyAndLogo = logoPosition === 'right'
+      ? `#grid(
+    columns: (1fr, ${logoWidthMm}),
     column-gutter: 2.5mm,
-    row-gutter: 0mm
+    align: (top, top),
+    [${formattedSideText.trim()}],
+    [#${logoImage}],
+  )`
+      : `#grid(
+    columns: (${logoWidthMm}, 1fr),
+    column-gutter: 2.5mm,
+    align: (top, top),
+    [#${logoImage}],
+    [${formattedSideText.trim()}],
   )`;
+    const restBlock = formattedRestText.trim() ? `\n#v(${leadingEm.toFixed(3)}em)\n${formattedRestText.trim()}` : '';
 
     if (logoVerticalAlign === 'titles-top') {
       const logoAndTitles = logoPosition === 'right'
@@ -218,9 +277,7 @@ ${formattedBody.trim()}`;
     [${titlesBlock}],
   )`;
 
-      return `#import "@preview/wrap-it:0.1.1": wrap-content
-
-#block(
+      return `#block(
   width: 100%,
   height: 100%,
   stroke: ${borderWidth} + luma(0%),
@@ -237,13 +294,11 @@ ${formattedBody.trim()}`;
   ${bodyParSettings}
 
   ${logoAndTitles}
-  ${wrappedBodyText}
+  ${formattedBody.trim()}
 ]`;
     }
 
-    return `#import "@preview/wrap-it:0.1.1": wrap-content
-
-#block(
+    return `#block(
   width: 100%,
   height: 100%,
   stroke: ${borderWidth} + luma(0%),
@@ -259,7 +314,7 @@ ${formattedBody.trim()}`;
   )
   ${bodyParSettings}
 
-  ${wrapBody}
+  ${titlesBlock}${bodyAndLogo}${restBlock}
 ]`;
   }
 
